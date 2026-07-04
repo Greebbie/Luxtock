@@ -99,14 +99,8 @@ output/       exported reports (gitignored)
 
 ## Acknowledgements
 
-Developed with **Claude Fable 5** (Anthropic) via Claude Code — architecture,
-TDD implementation, and multi-agent code review.
-
-The analysis policy itself — the methodology and playbooks in `framework/`
-(8-dimension framework, valuation multiple discipline, ten-state verdicts,
-price-target derivation, claim labeling) — was co-developed, stress-tested,
-and validated end-to-end with Fable 5, including live full-cycle analyses
-run against real market data.
+Analysis policy, strategy, and tooling optimized with **Claude Fable 5**
+(Anthropic) via Claude Code.
 
 ## Disclaimer
 
