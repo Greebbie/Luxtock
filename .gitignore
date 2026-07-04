@@ -1,0 +1,16 @@
+# private user data & exports
+data/
+output/
+
+# python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+dist/
+build/
+
+# local dev artifacts (session scratch, process docs, browser traces)
+.superpowers/
+docs/superpowers/
+.playwright-mcp/

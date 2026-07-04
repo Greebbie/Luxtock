@@ -1,0 +1,10 @@
+{
+  "stocks": [
+    {"ticker": "ON", "name": "onsemi", "thesis": "ev-adoption",
+     "layer": "power-semis", "added": "2026-07-02", "note": "example: SiC power semiconductors",
+     "holding": true},
+    {"ticker": "CHPT", "name": "ChargePoint", "thesis": "ev-adoption",
+     "layer": "charging", "added": "2026-07-02", "note": "example: charging network",
+     "holding": false}
+  ]
+}

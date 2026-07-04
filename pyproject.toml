@@ -1,0 +1,34 @@
+[project]
+name = "stocklux"
+version = "0.1.0"
+description = "Local-first equity research workbench: file-based data layer, LLM-agnostic analysis, calm research dashboard"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "yfinance>=0.2.40",
+  "pandas>=2.0",
+  "numpy>=1.26",
+  "pyyaml>=6.0",
+  "typer>=0.12",
+  "markdown>=3.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+stocklux = "stocklux.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["stocklux*"]
+
+[tool.setuptools.package-data]
+stocklux = ["web/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

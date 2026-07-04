@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StockLux · Research Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">STOCK<span>LUX</span> <em>stand in the light</em></div>
+  <div class="header-right">
+    <span id="quotes-age" class="muted"></span>
+    <button id="btn-refresh" class="ghost">Refresh quotes</button>
+  </div>
+  <nav id="nav">
+    <button data-view="overview" class="active">Overview</button>
+    <button data-view="theses">Theses</button>
+    <button data-view="manage">Manage</button>
+  </nav>
+</header>
+<main id="view"></main>
+<div id="toast"></div>
+<script src="marked.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
