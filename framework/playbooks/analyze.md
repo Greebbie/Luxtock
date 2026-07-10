@@ -10,15 +10,23 @@ discipline and the data contract. Write memos and reports in English.
    `fetched_at` is more than 24 hours old, run `stocklux refresh` yourself,
    then re-read them (prompt the user only if you cannot execute shell
    commands).
-2. Read `data/watchlist.json` to find the thesis this ticker is attached to,
-   and read the full text of `data/theses/<thesis>.md`. Note the entry's
+2. Read `data/watchlist.json`. If the entry has a `thesis` attached (most
+   need none — a thesis exists only for shared macro assumptions spanning
+   several names), read the full text of `data/theses/<thesis>.md`;
+   otherwise skip every thesis-related step below (the memo's own
+   narrative ruling, thesis-killer, and review trigger carry the
+   falsifiability). Note the entry's
    `holding` flag (missing = false) — it constrains which verdicts are legal
    (see the methodology's position-context rule). **Check the thesis's
-   `last_audited`**: if null or more than 90 days ago, the memo's overall
-   confidence caps at medium (methodology: "The thesis itself is under
-   test") — the analysis proceeds, but the summary must carry the cap line
-   and the report back to the user must recommend
-   `/lux-audit-thesis <id>`.
+   `last_audited`**: if null or more than 90 days ago, and any scenario
+   input is thesis-derived, the memo's overall confidence caps at medium
+   (methodology: "The thesis itself is under test") and the summary carries
+   the cap line. If every scenario input is market-sourced, set
+   `scenario_thesis_independent: true` in the frontmatter instead and keep
+   the memo body free of any mention of the thesis or its audit status.
+   Either way, the report back to the user (conversation only, never the
+   memo) should recommend `/lux-audit-thesis <id>` when the audit is
+   missing or stale.
 3. Read the **latest memo** under `data/analyses/<TICKER>/` if one exists. If
    none exists, this is a first-time analysis.
 4. **Collect user views.** Gather every view the user has expressed on this
@@ -92,12 +100,15 @@ Work through the dimension table from the methodology one by one. Requirements:
   story" — and whether retail narrative and institutional narrative have
   diverged.
 - For the remaining dimensions, answer the questions from the methodology table.
-- **Merge user views.** Attach each collected user view to the dimension it
-  belongs to as **[INFERENCE-USER]**, next to your own ruling. Where they
-  conflict, classify the divergence (edge / blind spot / unresolved, per the
-  methodology's "User views & divergence") and name the observable that
-  settles it. A user view never silently changes a ruling — if it genuinely
-  updates your judgment, say so and show the evidence that did the updating.
+- **Keep user views out of the dimensions.** Rule every dimension purely on
+  evidence — no **[INFERENCE-USER]** labels and no accommodation of user
+  opinions inside dimension text. Collected user views are handled entirely
+  in step 8's dedicated section (mapping, edge/blind-spot classification,
+  deciding observables). If a user view contains a verifiable fact, source
+  the fact and use it as **[FACT]** in the dimension; the view itself stays
+  in step 8. A user view never silently changes a ruling — if it genuinely
+  updates your judgment, the update must come from evidence, shown in the
+  dimension, with the credit recorded in step 8.
 
 ### 3. Scenario modeling & valuation ruling
 
@@ -125,7 +136,9 @@ Work through the dimension table from the methodology one by one. Requirements:
   table (EPS assumption / multiple / probability / target price / % vs.
   current price), closing with the **risk/reward ratio**
   ((base − current) / (current − bear)) — the ≥2 gate that precedence
-  rule 6 applies to `enter`.
+  rule 6 applies to `enter` — **and the EV companion** (probability-weighted
+  expected value and implied return at the current price and at each entry
+  tranche; see the methodology's EV-companion rule).
 - Ruling: current price below/within/above the range, with deviation
   percentage. If above the range, say so plainly: "buying here means prepaying
   for growth beyond the scenario."

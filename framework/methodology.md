@@ -69,6 +69,14 @@ advice — call it exactly as it is.**
      price − bear). An `enter` verdict requires risk/reward ≥ 2 (see
      precedence rule 6) — a discount that doesn't pay for the bear tail is
      not an entry edge.
+   - **EV companion (required next to the gate)**: also report the
+     probability-weighted 12-month expected value, EV = p_bear×bear +
+     p_base×base + p_bull×bull, and the implied expected return vs. the
+     current price (and vs. each entry tranche when a plan exists). The
+     ratio decides `enter`; the EV shows what the gate is trading away —
+     for right-skewed cyclicals the bear-anchored ratio can veto entries
+     the EV supports, and the memo must show both so that tension is
+     visible instead of hidden inside a verdict.
    - Every memo whose action is `enter` or `wait_for_pullback` must carry an
      **entry plan**: 1–3 tranche price levels tied to observable structure
      (good-buy boundary, prior consolidation, moving-average distance from
@@ -121,6 +129,15 @@ revisions with a flat price is a classic good entry; downward revisions
 against a rising price is an explicit warning on the price targets. These
 inputs size and time the entry; they never override a valuation ruling.
 
+**Quant snapshot note**: `data/quant.json` (spec and formulas:
+`framework/quant.md`) carries a deterministic setup score per ticker —
+valuation gap, EV, momentum, positioning, trend, composite + band +
+coverage — computed by code, never by the analyst. Memos dated on/after
+2026-07-12 must cite the composite, band, valuation gap and coverage in
+the Summary section (and in the entry plan when one exists). Scores time
+and size entries; they never override the verdict precedence rules, and
+the analyst never recomputes or adjusts them.
+
 **History note**: every `stocklux refresh` appends per-ticker snapshots
 (price, short interest, revision momentum, trend readings) to
 `data/history.jsonl`. Once it has depth, cite *changes* from it — "short
@@ -130,16 +147,21 @@ instead of online lookups for the covered window.
 
 ## User views & divergence (merging the user's own views)
 
-The user's private views are **inputs to the eight dimensions, not a ninth
-dimension**. Whenever the user has expressed a view on a name (in
-conversation, in the watchlist `note`, or in a thesis file), the analysis
-must:
+The user's private views live in **one dedicated report section only — they
+never enter the eight dimensions**. Dimension rulings must be free of
+**[INFERENCE-USER]** and must not be adjusted to accommodate a user view;
+the analysis text outside that section reads identically whether or not the
+user has an opinion. One deliberate exception: if a user view *contains a
+verifiable fact* (e.g. "institutions just cleared $26.5B at $149"), the
+**fact** enters the relevant dimension as **[FACT]** with its own source —
+the *view* built on it stays in the user section. Whenever the user has
+expressed a view on a name (in conversation, in the watchlist `note`, or in
+a thesis file), the user-views section must:
 
-1. **Map it.** Attach the view to the dimension(s) it actually belongs to
-   ("their new product is underrated" → `narrative`/`fundamentals`; "insiders
-   are buying" → `flows`; "the competitor is falling behind" → `competition`),
-   recorded as **[INFERENCE-USER]** side by side with your own ruling for
-   that dimension.
+1. **Map it.** Say which dimension(s) the view speaks to ("their new
+   product is underrated" → `narrative`/`fundamentals`; "insiders are
+   buying" → `flows`), recorded as **[INFERENCE-USER]** — in this section,
+   not in the dimension.
 2. **Rule on conflicts.** If the user's view and your ruling for that
    dimension disagree, classify the divergence — the same test the thesis
    audit uses:
@@ -173,24 +195,48 @@ ignoring the other side.
 
 ### The thesis itself is under test
 
-The same skepticism applies one level up. A thesis file is the user's
-**hypothesis, not a verified premise**. The analyze playbook is *conditional*
-on it — scenario EPS, the good-buy range, and the price targets all assume
-its pass-through math — and `thesis_health: intact` in a memo only means "no
-kill evidence has printed yet"; it is never a ruling that the thesis is
-right. What earns a thesis its status is the audit playbook (steel-man →
+The same skepticism applies one level up. **Ownership and optionality
+(2026-07-12):** a thesis file is the **desk's working hypothesis — written,
+maintained, and audited by the analysis itself**; the user contributes
+challenges and counter-evidence via `## Rebuttal` sections and the
+Divergence machinery, never as the structural spine. **Attachment is
+optional and should be the exception**: a name gets a thesis only when a
+*shared macro assumption spans several names* (so that one assumption
+dying is tracked as correlated risk across all of them). The default unit
+of falsifiability is the **memo** — every memo already carries its own
+narrative ruling, thesis-killer, and review trigger, and a simple
+valuation case or special situation needs no standalone narrative file.
+Never invent a thesis to satisfy structure. For names with one attached,
+it remains a *hypothesis, not a verified premise* — a challenge to be
+tested, never a prior that shapes the analyst's own evidence work. **Scenario independence rule:** scenario EPS, the good-buy
+range, and the price targets must be built from market-observable evidence
+(consensus estimates, contract prices, capacity and share data, filings) —
+the thesis supplies the *questions* (which layer, which pass-through to
+check), never the *numbers*. Each memo states whether its scenario inputs
+are thesis-independent; a verdict that would change if the thesis file were
+deleted is leaning on an unverified premise and must say so explicitly.
+`thesis_health: intact` in a memo only means "no kill evidence has printed
+yet"; it is never a ruling that the thesis is right. What earns a thesis its status is the audit playbook (steel-man →
 payload dissection → consensus check → adverse scenarios → ruling), and
 audits go stale:
 
-- **Freshness window: 90 days.** If the thesis's `last_audited` is null, or
-  more than 90 days before the memo's date, the memo's overall `confidence`
-  caps at **medium** (folded into confidence propagation below), and the
-  summary must carry the explicit line "confidence capped: thesis
-  unaudited" (or "audit stale"). A high-conviction call cannot stand on an
-  unverified premise, no matter how favorable the conditional evidence.
+- **Freshness window: 90 days — binds only thesis-dependent scenarios.**
+  If the thesis's `last_audited` is null, or more than 90 days before the
+  memo's date, **and** any scenario input (scenario EPS, pass-through
+  math, payload ruling) is thesis-derived rather than independently
+  sourced, the memo's overall `confidence` caps at **medium** (folded into
+  confidence propagation below) and the summary must carry the explicit
+  line "confidence capped: thesis unaudited" (or "audit stale"). A memo
+  whose every scenario input is market-sourced declares
+  `scenario_thesis_independent: true` in its frontmatter and escapes the
+  cap — **the memo body then makes no mention of the thesis or its audit
+  status at all** (the user's theses are their own hypotheses; a report
+  must never present them as having shaped or capped the analysis). The
+  overdue-audit reminder still goes in the *conversation report to the
+  user*, never in the memo body.
 - The dashboard cross-checks this deterministically and flags
   `confidence: high` memos sitting on unaudited/stale theses as format
-  violations.
+  violations, unless the memo declares `scenario_thesis_independent: true`.
 - The scan playbook flags overdue audits so the gate prompts an audit
   rather than silently degrading every memo forever.
 
@@ -260,9 +306,11 @@ runs of the same evidence land on the same verdict.
 **Confidence propagation.** The memo's overall `confidence` may not exceed
 the confidence of the `valuation` ruling, nor the confidence of the
 dimension carrying the thesis's payload assumption, **nor medium when the
-thesis's `last_audited` is null or more than 90 days before the memo date**
-(see "The thesis itself is under test"). A high-conviction verdict built on
-a low-confidence payload — or an unaudited premise — is a contract
+thesis's `last_audited` is null or more than 90 days before the memo date
+and the scenario is thesis-dependent** (see "The thesis itself is under
+test"; memos declaring `scenario_thesis_independent: true` escape that
+last cap). A high-conviction verdict built on a low-confidence payload —
+or on an unaudited premise it actually depends on — is a contract
 violation.
 
 ## Memo data contract
@@ -275,7 +323,12 @@ must include:
 ticker: "ON"                   # required — quote tickers YAML would parse as
                                 #   booleans (ON, NO, YES, etc.), e.g. "ON"
 date: 2026-07-04               # required, today's date
-thesis: ev-adoption            # required, filename under data/theses/
+thesis: ev-adoption            # OPTIONAL — only when a shared macro assumption spans several
+                               #   names (filename under data/theses/); most names carry none.
+                               #   Organizational metadata only, never the analysis spine.
+scenario_thesis_independent: true   # optional; true = every scenario input is market-sourced,
+                                    #   the audit-staleness confidence cap does not bind, and the
+                                    #   memo body must not mention the thesis or its audit status
 layer: power-semis             # bottleneck layer
 action: watch_only             # required, one of the ten states (verbatim)
 confidence: low                # required: high / medium / low

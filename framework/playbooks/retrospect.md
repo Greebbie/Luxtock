@@ -17,8 +17,14 @@ English.
 1. Read `data/quotes.json`; if `fetched_at` is more than 24 hours old, run
    `stocklux refresh` yourself, then re-read (prompt the user only if you
    cannot execute shell commands).
-2. Read every memo under `data/analyses/` (all dates, not just the latest).
-3. Read `data/retrospects/` for prior retrospect reports, so already-graded
+2. Run `stocklux calibrate` and read `data/calibration.json` — the
+   deterministic ledger (realized tiers, Brier scores, MAE/MFE, the
+   tracking table for immature memos) is the numeric backbone of this
+   playbook; the steps below add the judgment layer on top (verdict
+   quality, what-missed diagnosis, divergence outcomes). Never hand-compute
+   a number the ledger already carries.
+3. Read every memo under `data/analyses/` (all dates, not just the latest).
+4. Read `data/retrospects/` for prior retrospect reports, so already-graded
    memos are not re-graded (each report lists the memos it covered).
 
 ## Steps

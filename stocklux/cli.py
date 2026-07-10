@@ -1,4 +1,4 @@
-"""StockLux CLI: ui / refresh / add / export. Data dir = ./data under cwd."""
+"""Luxtock CLI: ui / refresh / add / export. Data dir = ./data under cwd."""
 from __future__ import annotations
 
 import sys
@@ -12,7 +12,7 @@ import uvicorn
 from . import refresh as refresh_mod
 from . import store
 
-app = typer.Typer(help="StockLux — local-first equity research workbench", no_args_is_help=True)
+app = typer.Typer(help="Luxtock — local-first equity research workbench", no_args_is_help=True)
 
 
 def _data_dir() -> Path:
@@ -38,7 +38,7 @@ def refresh() -> None:
 @app.command()
 def add(
     ticker: str,
-    thesis: str = typer.Option(..., help="thesis id (a filename under data/theses/)"),
+    thesis: str = typer.Option("", help="thesis id (a filename under data/theses/); optional"),
     layer: str = typer.Option("", help="supply-chain bottleneck layer, e.g. power-semis"),
     name: str = typer.Option("", help="company name"),
     note: str = typer.Option("", help="one-line note"),
@@ -47,10 +47,11 @@ def add(
 ) -> None:
     """Add a stock to the watchlist."""
     data_dir = _data_dir()
-    thesis_ids = [t["id"] for t in store.list_theses(data_dir)]
-    if thesis not in thesis_ids:
-        typer.echo(f"thesis '{thesis}' not found. Available: {thesis_ids or '(none — create one under data/theses/)'}")
-        raise typer.Exit(1)
+    if thesis:
+        thesis_ids = [t["id"] for t in store.list_theses(data_dir)]
+        if thesis not in thesis_ids:
+            typer.echo(f"thesis '{thesis}' not found. Available: {thesis_ids or '(none — create one under data/theses/)'}")
+            raise typer.Exit(1)
     try:
         wl = store.add_stock(store.load_watchlist(data_dir), ticker=ticker.upper(),
                              thesis=thesis, layer=layer, name=name, note=note,
@@ -59,7 +60,8 @@ def add(
         typer.echo(str(e))
         raise typer.Exit(1)
     store.save_watchlist(data_dir, wl)
-    typer.echo(f"added {ticker.upper()} → thesis {thesis}")
+    suffix = f" → thesis {thesis}" if thesis else ""
+    typer.echo(f"added {ticker.upper()}{suffix}")
 
 
 @app.command()
@@ -79,6 +81,141 @@ def hold(
 
 
 @app.command()
+def pair(
+    ticker: str,
+    paired_ticker: str = typer.Argument("", help="home-market listing (e.g. 000660.KS); empty with --off"),
+    ratio: float = typer.Option(1.0, help="underlying shares per ONE US share (10 ADR = 1 common → 0.1)"),
+    currency: str = typer.Option("USD", help="home-market quote currency (e.g. KRW); USD skips FX"),
+    off: bool = typer.Option(False, "--off", help="remove the pairing"),
+) -> None:
+    """Pair a listing with its home-market line — refresh then tracks parity & premium."""
+    data_dir = _data_dir()
+    paired = None if off else {"ticker": paired_ticker, "ratio": ratio, "currency": currency.upper()}
+    try:
+        wl = store.set_paired(store.load_watchlist(data_dir), ticker.upper(), paired)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(1)
+    store.save_watchlist(data_dir, wl)
+    typer.echo(f"{ticker.upper()} paired = {paired or '(removed)'}")
+
+
+@app.command()
+def quant() -> None:
+    """Deterministic feature vector + setup scores per ticker → data/quant.json."""
+    from .quant import build_quant
+
+    result = build_quant(_data_dir())
+    for ticker, entry in result["tickers"].items():
+        f, s = entry["features"], entry["scores"]
+        gap = f"{f['valuation_gap_pct']:+.1f}%" if f.get("valuation_gap_pct") is not None else "—"
+        ev = f"{f['ev_return_pct']:+.1f}%" if f.get("ev_return_pct") is not None else "—"
+        comp = f"{s['composite']:.0f}" if s.get("composite") is not None else "—"
+        typer.echo(f"{ticker:<6} px {f.get('price') or '—':>9}  gap {gap:>7}  EV {ev:>7}  "
+                   f"setup {comp:>3} [{s.get('band') or 'n/a'}]  coverage {s['coverage']:.0%}")
+    typer.echo("written: data/quant.json")
+
+
+@app.command()
+def shares(
+    ticker: str,
+    count: float = typer.Argument(..., help="share count (0 clears the field)"),
+) -> None:
+    """Set the share count on a holding — sizing input for `stocklux portfolio`."""
+    data_dir = _data_dir()
+    try:
+        wl = store.set_shares(store.load_watchlist(data_dir), ticker.upper(), count)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(1)
+    store.save_watchlist(data_dir, wl)
+    typer.echo(f"{ticker.upper()} shares = {count if count else '(cleared)'}")
+
+
+@app.command()
+def cash(
+    amount: float = typer.Argument(..., help="cash balance in USD (negative clears it)"),
+) -> None:
+    """Set the portfolio cash balance (context for `stocklux portfolio` weights)."""
+    data_dir = _data_dir()
+    wl = store.set_cash(store.load_watchlist(data_dir), None if amount < 0 else amount)
+    store.save_watchlist(data_dir, wl)
+    typer.echo(f"cash_usd = {wl.get('cash_usd', '(cleared)')}")
+
+
+@app.command()
+def portfolio() -> None:
+    """Concentration & bear-stress report over sized holdings (spec: framework/quant.md)."""
+    from .portfolio import portfolio_report
+
+    report = portfolio_report(_data_dir())
+    if not report["positions"]:
+        typer.echo("no holdings — mark one with `stocklux hold <TICKER>` and size it "
+                   "with `stocklux shares <TICKER> <N>`")
+        raise typer.Exit(0)
+    for p in report["positions"]:
+        if p.get("unsized"):
+            typer.echo(f"{p['ticker']:<6} (unsized — `stocklux shares {p['ticker']} <N>`)")
+        else:
+            typer.echo(f"{p['ticker']:<6} {p['shares']:>8.2f} sh × {p['price']:>10.2f} "
+                       f"= {p['value']:>12,.0f}  {p['weight_pct']:>5.1f}%")
+    typer.echo(f"cash   {report['cash_usd']:>12,.0f}   total {report['total_value']:,.0f}")
+    for group_kind, groups in report["groups"].items():
+        for gname, w in sorted(groups.items(), key=lambda kv: -kv[1]):
+            typer.echo(f"  {group_kind[3:]:<8} {gname:<14} {w:.1f}%")
+    bs = report["bear_stress"]
+    if bs.get("drawdown_pct") is not None:
+        typer.echo(f"bear stress: {bs['drawdown_pct']:+.1f}% "
+                   f"(covered: {', '.join(bs['covered_tickers']) or '—'}"
+                   f"{'; uncovered: ' + ', '.join(bs['uncovered_tickers']) if bs['uncovered_tickers'] else ''})")
+    for f in report["flags"]:
+        typer.echo(f"[{f['level'].upper()}] {f['kind']}: {f['detail']}")
+
+
+@app.command()
+def check(
+    quiet: bool = typer.Option(False, "--quiet", help="print nothing when there are no alerts"),
+) -> None:
+    """Price alerts vs memo levels (tranches/invalidation/trim/bear/bull) + portfolio flags.
+
+    Stateless — re-fires on every run; exit code 1 when any alert is active (cron-friendly).
+    """
+    from .check import run_checks
+
+    result = run_checks(_data_dir())
+    alerts = result["alerts"]
+    if not alerts:
+        if not quiet:
+            typer.echo("no alerts")
+        raise typer.Exit(0)
+    for a in alerts:
+        typer.echo(f"[{a['level'].upper():<7}] {a['ticker']:<9} {a['kind']}: {a['detail']}")
+    raise typer.Exit(1)
+
+
+@app.command()
+def calibrate() -> None:
+    """Grade matured price targets (Brier ledger) + track immature ones → data/calibration.json."""
+    from .calibrate import calibrate as run_calibrate
+
+    result = run_calibrate(_data_dir())
+    agg = result["aggregate"]
+    typer.echo(f"matured: {agg['n']} graded"
+               + (f", mean Brier {agg['mean_brier']:.3f}" if agg.get("mean_brier") is not None else ""))
+    for row in result["matured"]:
+        note = f"  ({row['note']})" if row.get("note") else ""
+        tier = row.get("realized_tier") or "—"
+        brier = f"{row['brier']:.3f}" if row.get("brier") is not None else "—"
+        typer.echo(f"  {row['ticker']:<6} {row['memo_date']}  tier={tier}  brier={brier}{note}")
+    typer.echo(f"tracking: {len(result['tracking'])} immature")
+    for row in result["tracking"]:
+        typer.echo(f"  {row['ticker']:<6} {row['memo_date']}  {row['months_elapsed']:.1f}mo  "
+                   f"bear→bull {row['pct_between_bear_bull']:.0f}%  "
+                   f"{'above' if row['above_base'] else 'below'} base")
+    typer.echo("written: data/calibration.json")
+
+
+@app.command()
 def export(
     ticker: str,
     pdf: bool = typer.Option(False, "--pdf", help="also print to PDF via local Edge/Chrome"),
@@ -93,6 +230,22 @@ def export(
     except FileNotFoundError as e:
         typer.echo(str(e))
         raise typer.Exit(1)
+    typer.echo(f"HTML: {result['html']}")
+    if result["pdf"]:
+        typer.echo(f"PDF:  {result['pdf']}")
+    elif pdf:
+        typer.echo(f"PDF not generated: {result['pdf_error']}")
+
+
+@app.command()
+def report(
+    pdf: bool = typer.Option(False, "--pdf", help="also print to PDF via local Edge/Chrome"),
+    out: str = typer.Option("output", help="output directory"),
+) -> None:
+    """One desk-level report: portfolio, quant table, verdicts, alerts, calibration."""
+    from .report import export_report
+
+    result = export_report(_data_dir(), Path.cwd() / out, pdf=pdf)
     typer.echo(f"HTML: {result['html']}")
     if result["pdf"]:
         typer.echo(f"PDF:  {result['pdf']}")

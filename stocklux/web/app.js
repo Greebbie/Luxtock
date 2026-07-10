@@ -1,6 +1,6 @@
 /* StockLux dashboard — talks only to the backend API; no LLM dependency. */
 const $ = (sel) => document.querySelector(sel);
-const state = { view: "overview", ticker: null, dataVersion: 0 };
+const state = { view: "overview", ticker: null, dataVersion: 0, quant: null, stocksCache: {} };
 
 const SIG_LABEL = { chain: "chain", narrative: "narrative", fundamentals: "fundamentals",
                     valuation: "valuation", flows: "flows", sentiment: "sentiment",
@@ -42,6 +42,112 @@ function signalDots(signals) {
     const v = signals[k] || "no_signal";
     return `<span title="${SIG_LABEL[k]}: ${esc(v)}"><span class="sig sig-${esc(v)}"></span></span>`;
   }).join("");
+}
+
+function setupCell(quant, ticker) {
+  const t = quant && quant.tickers && quant.tickers[ticker];
+  const s = t && t.scores;
+  if (!s || s.composite == null) return '<span class="muted">—</span>';
+  const band = s.band || "n/a";
+  const cls = { strong: "chip-strong", fair: "chip-fair", weak: "chip-weak" }[band] || "chip-na";
+  const coverage = s.coverage != null ? `coverage ${Math.round(s.coverage * 100)}%` : "coverage —";
+  return `<span class="chip ${cls}" title="${esc(coverage)}">${Math.round(s.composite)} <span class="muted">${esc(band)}</span></span>`;
+}
+
+const QUANT_FACTOR_GROUPS = [
+  ["Valuation", ["valuation_gap_pct", "gap_to_floor_pct", "rr_ratio", "ev_return_pct"]],
+  ["Momentum", ["rev_90d_pct", "rev_breadth"]],
+  ["Positioning", ["short_pct_float", "put_call_oi_ratio", "inst_pct", "rec_mean",
+                    "n_analysts", "pt_spread_pct", "pt_upside_pct"]],
+  ["Trend", ["rsi_14", "dist_50dma_pct", "dist_200dma_pct", "atr_pct_14", "rel_strength_3m"]],
+  ["Deltas & info", ["d14_price_pct", "d14_short_pct_float", "d14_rsi", "paired_premium_pct", "price"]],
+];
+
+const QUANT_FACTOR_LABEL = {
+  valuation_gap_pct: "valuation gap", gap_to_floor_pct: "gap to floor", rr_ratio: "risk/reward",
+  ev_return_pct: "EV return", rev_90d_pct: "90d EPS revision", rev_breadth: "revision breadth",
+  short_pct_float: "short % float", put_call_oi_ratio: "put/call OI", inst_pct: "institutional %",
+  rec_mean: "analyst rec (mean)", n_analysts: "# analysts", pt_spread_pct: "PT spread",
+  pt_upside_pct: "PT upside", rsi_14: "RSI-14", dist_50dma_pct: "dist 50dma",
+  dist_200dma_pct: "dist 200dma", atr_pct_14: "ATR % (14d)", rel_strength_3m: "rel strength (3m)",
+  d14_price_pct: "14d price Δ", d14_short_pct_float: "14d short % Δ", d14_rsi: "14d RSI Δ",
+  paired_premium_pct: "paired premium", price: "price",
+};
+
+// Percent-family formatting buckets — see spec in framework/quant.md.
+const QUANT_PERCENT_1DP = new Set(["valuation_gap_pct", "gap_to_floor_pct", "ev_return_pct",
+  "rev_90d_pct", "pt_spread_pct", "pt_upside_pct", "d14_price_pct", "paired_premium_pct",
+  "dist_50dma_pct", "dist_200dma_pct", "atr_pct_14", "rel_strength_3m"]);
+const QUANT_FRACTION_PERCENT = new Set(["short_pct_float", "inst_pct", "d14_short_pct_float"]);
+const QUANT_RATIO_2DP = new Set(["rr_ratio", "put_call_oi_ratio", "rec_mean", "rev_breadth"]);
+const QUANT_PLAIN_1DP = new Set(["rsi_14", "d14_rsi"]);
+const QUANT_COUNT_INT = new Set(["n_analysts"]);
+
+function quantFactorValue(key, v) {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (QUANT_PERCENT_1DP.has(key)) return `${n.toFixed(1)}%`;
+  if (QUANT_FRACTION_PERCENT.has(key)) return `${(n * 100).toFixed(1)}%`;
+  if (QUANT_RATIO_2DP.has(key)) return n.toFixed(2);
+  if (QUANT_PLAIN_1DP.has(key)) return n.toFixed(1);
+  if (QUANT_COUNT_INT.has(key)) return String(Math.round(n));
+  if (key === "price") return n.toFixed(2);
+  return n.toFixed(2);
+}
+
+function quantBarColor(v) {
+  if (v == null) return "var(--none)";
+  if (v >= 70) return "var(--good)";
+  if (v >= 50) return "var(--amber)";
+  return "var(--bad)";
+}
+
+function quantScoreBar(label, value, weight) {
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, value));
+  const color = quantBarColor(value);
+  const valueText = value == null ? "no data" : String(Math.round(value));
+  return `<div class="quant-bar-row">
+    <div class="quant-bar-label"><span>${esc(label)}</span><span class="muted">${esc(weight)}</span></div>
+    <div class="quant-bar-track"><div class="quant-bar-fill${value == null ? " empty" : ""}"
+      style="width:${pct}%;background:${color}"></div></div>
+    <div class="quant-bar-value" style="color:${value == null ? "var(--muted)" : color}">${esc(valueText)}</div>
+  </div>`;
+}
+
+function quantFactorTable(features) {
+  const f = features || {};
+  const groups = QUANT_FACTOR_GROUPS.map(([label, keys]) => {
+    const rows = keys.map((k) => `<tr><td>${esc(QUANT_FACTOR_LABEL[k] || pretty(k))}</td>
+      <td>${quantFactorValue(k, f[k])}</td></tr>`).join("");
+    return `<tr class="factor-group"><th colspan="2">${esc(label)}</th></tr>${rows}`;
+  }).join("");
+  return `<table class="quant-factors">${groups}</table>`;
+}
+
+function quantChip(scores) {
+  if (!scores || scores.composite == null) return '<span class="muted">—</span>';
+  const band = scores.band || "n/a";
+  const cls = { strong: "chip-strong", fair: "chip-fair", weak: "chip-weak" }[band] || "chip-na";
+  return `<span class="chip ${cls}">${Math.round(scores.composite)} <span class="muted">${esc(band)}</span></span>`;
+}
+
+function quantCard(ticker, t) {
+  const s = t.scores || {};
+  const coverage = s.coverage != null ? `${Math.round(s.coverage * 100)}%` : "—";
+  return `<div class="quant-card">
+    <div class="quant-card-header">
+      <span class="ticker">${esc(ticker)}</span>
+      ${quantChip(s)}
+      <span class="muted">coverage ${coverage}</span>
+    </div>
+    <div class="quant-bars">
+      ${quantScoreBar("Valuation", s.valuation, "40%")}
+      ${quantScoreBar("Momentum", s.momentum, "25%")}
+      ${quantScoreBar("Positioning", s.positioning, "15%")}
+      ${quantScoreBar("Trend", s.trend, "20%")}
+    </div>
+    ${quantFactorTable(t.features)}
+  </div>`;
 }
 
 function verdictBadge(memo) {
@@ -104,26 +210,147 @@ function verdictCard(meta, currentPrice) {
     `<div class="vc-item"><div class="vc-k">${k}</div><div class="vc-v">${v}</div></div>`).join("")}</div>`;
 }
 
+function riskRewardTargets(pt, currentPrice) {
+  if (!pt || pt.base == null) return '<p class="muted">no price targets on file</p>';
+  const rows = ["bear", "base", "bull"].map((tier) => {
+    const target = pt[tier];
+    const prob = pt[`p_${tier}`];
+    const vs = (target != null && currentPrice) ? `${sgn(((target / currentPrice - 1) * 100), 0)}%` : "—";
+    return `<tr><td class="muted">${tier}</td><td>${fmt(target, 0)}</td>
+      <td>${prob != null ? Math.round(prob * 100) + "%" : "—"}</td><td>${vs}</td></tr>`;
+  }).join("");
+  return `<table class="rr-table"><tr><th>Tier</th><th>Target</th><th>Prob</th><th>vs current</th></tr>${rows}</table>
+    <div class="muted" style="margin-top:4px">horizon ${esc(pt.horizon || "12mo")}</div>`;
+}
+
+function riskRewardStats(features) {
+  const f = features || {};
+  const ev = f.ev_return_pct != null ? quantFactorValue("ev_return_pct", f.ev_return_pct) : "—";
+  const rr = f.rr_ratio != null ? quantFactorValue("rr_ratio", f.rr_ratio) : "—";
+  return `<div class="rr-row">EV return <b>${ev}</b> <span class="muted">·</span> R:R <b>${rr}</b></div>`;
+}
+
+function entryPlanBlock(ep) {
+  if (!ep || !Array.isArray(ep.tranches)) return '<span class="muted">no entry plan on file</span>';
+  return `tranches <b>${ep.tranches.map((t) => fmt(t, 0)).join(" / ")}</b>
+    <span class="muted">·</span> invalidation <b>${fmt(ep.invalidation, 0)}</b>`;
+}
+
+function metaTags(meta) {
+  const tags = [
+    meta.action ? ["action", pretty(meta.action)] : null,
+    meta.confidence ? ["confidence", meta.confidence] : null,
+    meta.thesis_health ? ["thesis health", pretty(meta.thesis_health)] : null,
+  ].filter(Boolean);
+  return tags.map(([k, v]) => `<span class="tag-meta">${esc(k)}: ${esc(v)}</span>`).join(" ");
+}
+
+function riskTags(risks) {
+  if (!Array.isArray(risks) || !risks.length) return '<span class="muted">—</span>';
+  return risks.map((r) => `<span class="tag-risk">${esc(pretty(r))}</span>`).join(" ");
+}
+
+function riskRewardPanel(meta, currentPrice, features) {
+  if (!meta) {
+    return `<div class="rr-panel"><h3>Risk / Reward</h3>
+      <p class="muted">not analyzed yet — run an analysis to populate targets</p></div>`;
+  }
+  const br = meta.buy_range;
+  const range = Array.isArray(br) && br.length === 2 ? `${fmt(br[0], 0)}–${fmt(br[1], 0)}` : "—";
+  return `<div class="rr-panel">
+    <h3>Risk / Reward</h3>
+    <div class="rr-row">${verdictBadge(meta)} ${metaTags(meta)}</div>
+    <div class="rr-row">Price now <b>${fmt(currentPrice, 2)}</b>
+      <span class="muted">vs at analysis ${fmt(meta.price_at_analysis, 2)}</span></div>
+    <div class="rr-row">Buy range <b>${range}</b></div>
+    ${riskRewardTargets(meta.price_targets, currentPrice)}
+    ${riskRewardStats(features)}
+    <div class="rr-row">Entry plan: ${entryPlanBlock(meta.entry_plan)}</div>
+    <div class="rr-row">Top risks: ${riskTags(meta.top_risks)}</div>
+    <details class="rr-details"><summary>Review triggers</summary>
+      <div class="muted">${esc(meta.review_trigger || "—")}</div></details>
+  </div>`;
+}
+
+function expandedRowHtml(ticker, stockData) {
+  const qt = state.quant && state.quant.tickers && state.quant.tickers[ticker];
+  const leftHtml = qt
+    ? quantCard(ticker, qt)
+    : `<p class="muted">no quant snapshot for ${esc(ticker)}</p>`;
+  const memos = (stockData && stockData.memos) || [];
+  const latest = memos[0];
+  const currentPrice = stockData && stockData.quote ? stockData.quote.price : null;
+  const rightHtml = riskRewardPanel(latest ? latest.meta : null, currentPrice, qt && qt.features);
+  let bottomHtml = "";
+  if (latest) {
+    const errs = latest.errors && latest.errors.length
+      ? `<div class="badge no">frontmatter warnings: ${esc(latest.errors.join("; "))}</div>` : "";
+    bottomHtml = `<details class="panel">
+      <summary>Full analysis (latest memo) <span class="muted">${esc(String(latest.meta.date || ""))}</span></summary>
+      ${errs}<div class="memo-body">${marked.parse(latest.body)}</div>
+    </details>`;
+    if (memos.length > 1) {
+      const n = memos.length - 1;
+      bottomHtml += `<div class="muted" style="margin-top:8px">${n} older memo${n === 1 ? "" : "s"} — see detail view</div>`;
+    }
+  }
+  return `<div class="expand-wrap">
+    <div class="expand-grid">
+      <div class="expand-col"><h3>Quant model</h3>${leftHtml}</div>
+      <div class="expand-col">${rightHtml}</div>
+    </div>
+    ${bottomHtml}
+  </div>`;
+}
+
+async function toggleRow(ticker) {
+  const detail = document.getElementById(`detail-${ticker}`);
+  const chev = document.getElementById(`chev-${ticker}`);
+  if (!detail) return;
+  const cell = detail.querySelector("td");
+  const opening = detail.style.display === "none";
+  if (!opening) {
+    detail.style.display = "none";
+    if (chev) chev.classList.remove("open");
+    return;
+  }
+  if (chev) chev.classList.add("open");
+  detail.style.display = "table-row";
+  if (!state.stocksCache[ticker]) {
+    cell.innerHTML = '<p class="muted">Loading…</p>';
+    try {
+      state.stocksCache[ticker] = await api(`/api/stocks/${ticker}`);
+    } catch (e) {
+      cell.innerHTML = `<p class="muted">Failed to load: ${esc(e.message)}</p>`;
+      return;
+    }
+  }
+  cell.innerHTML = expandedRowHtml(ticker, state.stocksCache[ticker]);
+}
+
 async function renderOverview() {
-  const ov = await api("/api/overview");
+  const [ov, quant] = await Promise.all([api("/api/overview"), api("/api/quant")]);
+  state.quant = quant;
   $("#quotes-age").textContent = ov.quotes_fetched_at
     ? `quotes as of ${new Date(ov.quotes_fetched_at).toLocaleString()}` : "no quote data";
-  const byThesis = {};
-  for (const r of ov.rows) (byThesis[r.thesis] ||= []).push(r);
+  const byLayer = {};
+  for (const r of ov.rows) (byLayer[r.layer || "(no layer)"] ||= []).push(r);
+  const layers = Object.keys(byLayer).sort((a, b) => a.localeCompare(b));
   let html = "";
-  for (const [thesis, rows] of Object.entries(byThesis)) {
-    const meta = ov.theses[thesis] || {};
-    html += `<h2>${esc(meta.name || thesis)} <span class="muted">thesis: ${esc(thesis)} · ${esc(meta.status || "?")}</span></h2>`;
-    html += `<table><tr><th>Ticker</th><th>Layer</th><th>Price</th><th>Buy range</th>
-             <th>Target (base)</th><th>Range</th><th>Verdict</th><th>Signals</th><th>Status</th></tr>`;
+  for (const layer of layers) {
+    const rows = byLayer[layer].slice().sort((a, b) => a.ticker.localeCompare(b.ticker));
+    html += `<div class="layer-heading">${esc(layer)}</div>`;
+    html += `<table><tr><th></th><th>Ticker</th><th>Layer</th><th>Price</th><th>Buy range</th>
+             <th>Target (base)</th><th>Range</th><th>Verdict</th><th>Signals</th><th>Setup</th><th>Status</th></tr>`;
     for (const r of rows) {
       const q = r.quote || {};
       const m = r.memo;
       const range = m && m.buy_range ? `${m.buy_range[0]}–${m.buy_range[1]}` : "—";
       const err = r.memo_errors && r.memo_errors.length
         ? ` <span class="badge no" title="${esc(r.memo_errors.join("; "))}">memo format warning</span>` : "";
-      html += `<tr>
-        <td><span class="ticker" onclick="showStock('${r.ticker}')">${r.ticker}</span>${r.holding ? ' <span class="badge ok" title="user holds a position — hold/trim/exit verdicts apply">held</span>' : ""}
+      html += `<tr class="row-main" onclick="toggleRow('${r.ticker}')">
+        <td class="expand-cell"><span class="chevron" id="chev-${r.ticker}">▸</span></td>
+        <td><span class="ticker" onclick="event.stopPropagation(); showStock('${r.ticker}')">${r.ticker}</span>${r.holding ? ' <span class="badge ok" title="user holds a position — hold/trim/exit verdicts apply">held</span>' : ""}
             <div class="muted">${esc(r.name)}</div></td>
         <td class="muted">${esc(r.layer)}</td>
         <td>${fmt(q.price, 2)}${q.stale ? ' <span class="badge warn">stale</span>' : ""}</td>
@@ -132,8 +359,10 @@ async function renderOverview() {
         <td>${verdictBadge(m)}${err}</td>
         <td>${m ? esc(pretty(m.action)) : "—"}</td>
         <td>${signalDots(m && m.signals)}</td>
+        <td>${setupCell(quant, r.ticker)}</td>
         <td>${stalenessNote(r.staleness) || '<span class="muted">·</span>'}</td>
-      </tr>`;
+      </tr>
+      <tr class="row-detail" id="detail-${r.ticker}" style="display:none"><td colspan="11"></td></tr>`;
     }
     html += "</table>";
   }

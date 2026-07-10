@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import store
+from .portfolio import portfolio_report
 from .refresh import load_json, refresh_data
 
 _MEMO_SUMMARY_KEYS = (
@@ -35,8 +36,14 @@ def _as_date(v) -> date:
 def _audit_freshness_errors(meta: dict, thesis_meta: dict | None) -> list[str]:
     """The methodology caps memo confidence at medium when the thesis is
     unaudited or its audit is >90 days older than the memo ("The thesis
-    itself is under test"). Flag high-confidence memos that violate it."""
+    itself is under test"). Flag high-confidence memos that violate it.
+    Memos declaring scenario_thesis_independent: true derive every scenario
+    input from market data, so the cap does not bind them."""
     if meta.get("confidence") != "high":
+        return []
+    if "thesis" not in meta:
+        return []  # nothing to audit against
+    if meta.get("scenario_thesis_independent") is True:
         return []
     thesis = meta.get("thesis")
     last = (thesis_meta or {}).get("last_audited")
@@ -121,7 +128,7 @@ def build_overview(data_dir: Path) -> dict:
 
 class AddStockBody(BaseModel):
     ticker: str
-    thesis: str
+    thesis: str = ""
     layer: str = ""
     name: str = ""
     note: str = ""
@@ -134,7 +141,16 @@ class ThesisBody(BaseModel):
 
 def create_app(data_dir: Path) -> FastAPI:
     data_dir = Path(data_dir)
-    app = FastAPI(title="StockLux")
+    app = FastAPI(title="Luxtock")
+
+    @app.middleware("http")
+    async def no_cache(request, call_next):
+        # force revalidation on every load — browsers heuristically cache
+        # the SPA otherwise and show a stale dashboard after upgrades
+        # (304 via ETag when unchanged, so this stays cheap)
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
     @app.get("/api/overview")
     def overview():
@@ -152,9 +168,10 @@ def create_app(data_dir: Path) -> FastAPI:
 
     @app.post("/api/watchlist")
     def add_stock(body: AddStockBody):
-        thesis_ids = [t["id"] for t in store.list_theses(data_dir)]
-        if body.thesis not in thesis_ids:
-            raise HTTPException(422, f"thesis not found: {body.thesis}")
+        if body.thesis:
+            thesis_ids = [t["id"] for t in store.list_theses(data_dir)]
+            if body.thesis not in thesis_ids:
+                raise HTTPException(422, f"thesis not found: {body.thesis}")
         try:
             wl = store.add_stock(
                 store.load_watchlist(data_dir), ticker=body.ticker.upper(),
@@ -188,6 +205,14 @@ def create_app(data_dir: Path) -> FastAPI:
     def trigger_refresh():
         threading.Thread(target=refresh_data, args=(data_dir,), daemon=True).start()
         return {"ok": True, "message": "background refresh started"}
+
+    @app.get("/api/quant")
+    def quant():
+        return load_json(data_dir / "quant.json") or {"computed_at": None, "tickers": {}}
+
+    @app.get("/api/portfolio")
+    def portfolio():
+        return portfolio_report(data_dir)
 
     @app.get("/api/status")
     def status():

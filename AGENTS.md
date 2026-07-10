@@ -62,8 +62,13 @@ playbook below.
 - `data/watchlist.json` — the tracked list; entries may carry an optional
   `holding: true` flag (`stocklux hold <TICKER>`) marking names the user
   actually owns — no share counts or P&L, by design
-- `data/theses/*.md` — the user's personal narratives (may be audited, body
-  and `## Rebuttal` sections may not be rewritten without authorization)
+- `data/theses/*.md` — the **desk's working hypotheses** (analyst-owned,
+  audited by the audit playbook). Attached to a name only when a shared
+  macro assumption spans several names; most names need none — the memo is
+  the unit of falsifiability. The user challenges via `## Rebuttal`
+  sections (those may not be rewritten without authorization) and the
+  Divergence machinery; theses are never the structural spine of analysis
+  or presentation.
 - `data/analyses/<TICKER>/*.md` — analysis memos, filename is the date
 - `data/retrospects/*.md` — calibration reports grading matured price targets
 - `data/quotes.json` / `data/flows.json` — deterministically fetched hard
@@ -73,6 +78,36 @@ playbook below.
   read-only for agents — cite it for *changes over time* and for
   retrospect path grading. It grows forever by design: **filter it**
   (grep by ticker, tail by date) — never load the whole file into context
+- `data/quant.json` — deterministic feature vector + setup scores per
+  ticker, written by `stocklux quant` (spec: `framework/quant.md`).
+  Read-only for agents: cite the numbers, never recompute or restyle them.
+  Memos dated on/after 2026-07-12 cite the snapshot in their Summary and
+  entry plan.
+- `data/calibration.json` — probability ledger written by
+  `stocklux calibrate`: Brier scores for matured price targets + a
+  tracking table for immature ones. Read-only for agents; the retrospect
+  playbook is its consumer.
+
+## CLI toolbox (works from any LLM CLI or plain shell)
+
+Everything below is deterministic code — no LLM involvement. Any agent
+(Claude Code, Codex, Gemini CLI, …) or cron job can run these; all state
+lives in plain files under `data/`.
+
+| command | purpose |
+|---|---|
+| `stocklux refresh` | fetch quotes/flows (+ paired-listing parity & premium), append history |
+| `stocklux add <T> --thesis <id>` / `hold` / `shares <T> <N>` / `cash <N>` | watchlist, holding flag, position sizing |
+| `stocklux pair <T> <HOME_TICKER> --ratio R --currency C` | pair a US listing with its home-market line (premium tracked on refresh) |
+| `stocklux quant` | feature vector + setup scores → `data/quant.json` (spec: `framework/quant.md`) |
+| `stocklux portfolio` | concentration & bear-stress report + flags |
+| `stocklux check` | price alerts vs memo levels + portfolio flags; exit 1 when any alert (cron-friendly) |
+| `stocklux calibrate` | Brier ledger for matured targets + tracking table → `data/calibration.json` |
+| `stocklux export <T> --pdf` | self-contained HTML/PDF report of the latest memo + quant snapshot |
+| `stocklux report --pdf` | ONE desk-level HTML/PDF: portfolio, quant table, all verdicts, alerts, calibration |
+| `stocklux ui` | live dashboard (reads `data/` directly) |
+
+The operator's mechanical rules live in `framework/operating-contract.md`.
 
 ## Getting started
 

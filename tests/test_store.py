@@ -29,6 +29,60 @@ def test_add_stock_rejects_bad_ticker():
         store.add_stock({"stocks": []}, ticker="mu!", thesis="x")
 
 
+def test_add_stock_without_thesis_omits_key():
+    # thesis is optional: omitted entirely → no "thesis" key on the entry
+    out = store.add_stock({"stocks": []}, ticker="ON", layer="power-semis")
+    assert "thesis" not in out["stocks"][0]
+    # explicit empty string behaves the same as omitted
+    out2 = store.add_stock({"stocks": []}, ticker="MU", thesis="")
+    assert "thesis" not in out2["stocks"][0]
+
+
+def test_watchlist_mutators_preserve_top_level_keys():
+    # cash_usd (and any future top-level key) must survive every mutator
+    wl = {"stocks": [], "cash_usd": 7100.0}
+    wl = store.add_stock(wl, ticker="MU", thesis="x")
+    assert wl["cash_usd"] == 7100.0
+    wl = store.set_holding(wl, "MU", True)
+    assert wl["cash_usd"] == 7100.0
+    wl = store.set_shares(wl, "MU", 5)
+    assert wl["cash_usd"] == 7100.0
+    wl = store.remove_stock(wl, "MU")
+    assert wl["cash_usd"] == 7100.0
+
+
+def test_set_shares_returns_new_object():
+    wl = {"stocks": [{"ticker": "MU", "holding": True}]}
+    out = store.set_shares(wl, "MU", 5)
+    assert wl["stocks"][0].get("shares") is None  # original not mutated
+    assert out["stocks"][0]["shares"] == 5.0
+
+
+def test_set_shares_zero_removes_field():
+    wl = {"stocks": [{"ticker": "MU", "holding": True, "shares": 5.0}]}
+    out = store.set_shares(wl, "MU", 0)
+    assert "shares" not in out["stocks"][0]
+
+
+def test_set_shares_rejects_negative_and_unknown():
+    wl = {"stocks": [{"ticker": "MU", "holding": True}]}
+    with pytest.raises(ValueError):
+        store.set_shares(wl, "MU", -1)
+    with pytest.raises(ValueError):
+        store.set_shares(wl, "ZZZ", 1)
+
+
+def test_set_cash_sets_and_clears():
+    wl = {"stocks": []}
+    out = store.set_cash(wl, 7100.0)
+    assert out["cash_usd"] == 7100.0
+    assert "cash_usd" not in wl  # original not mutated
+    cleared = store.set_cash(out, None)
+    assert "cash_usd" not in cleared
+    with pytest.raises(ValueError):
+        store.set_cash(wl, -5)
+
+
 def test_add_stock_rejects_duplicate():
     wl = store.add_stock({"stocks": []}, ticker="ON", thesis="x")
     with pytest.raises(ValueError):
@@ -118,6 +172,20 @@ def test_parse_no_frontmatter():
 def test_validate_memo_ok():
     meta, _ = store.parse_frontmatter(VALID_MEMO)
     assert store.validate_memo(meta) == []
+
+
+def test_validate_memo_thesis_absent_is_legal():
+    meta, _ = store.parse_frontmatter(VALID_MEMO)
+    del meta["thesis"]
+    assert store.validate_memo(meta) == []
+
+
+def test_validate_memo_thesis_present_must_be_non_empty_string():
+    meta, _ = store.parse_frontmatter(VALID_MEMO)
+    errors = store.validate_memo({**meta, "thesis": ""})
+    assert any("thesis" in e for e in errors)
+    errors2 = store.validate_memo({**meta, "thesis": 123})
+    assert any("thesis" in e for e in errors2)
 
 
 def test_validate_memo_catches_errors():
@@ -290,3 +358,67 @@ def test_validate_memo_rejects_boolean_ticker():
     meta, _ = store.parse_frontmatter(VALID_MEMO.replace('ticker: "ON"', "ticker: ON"))
     assert meta["ticker"] is True
     assert any("ticker" in e for e in store.validate_memo(meta))
+
+
+# ---------------------------------------------------------------------------
+# set_paired
+# ---------------------------------------------------------------------------
+
+
+def test_set_paired_sets_new_object():
+    wl = store.add_stock({"stocks": []}, ticker="SKHYV", thesis="x")
+    paired = {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"}
+    out = store.set_paired(wl, "SKHYV", paired)
+    assert "paired" not in wl["stocks"][0]  # original not mutated
+    assert out["stocks"][0]["paired"] == paired
+    assert out["stocks"][0]["paired"] is not paired  # defensive copy, not the same object
+
+
+def test_set_paired_defaults_currency_to_usd():
+    wl = store.add_stock({"stocks": []}, ticker="MU", thesis="x")
+    out = store.set_paired(wl, "MU", {"ticker": "MAERSK.CO", "ratio": 2.0})
+    assert out["stocks"][0]["paired"]["currency"] == "USD"
+
+
+def test_set_paired_replaces_existing():
+    wl = store.add_stock({"stocks": []}, ticker="SKHYV", thesis="x")
+    wl = store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"})
+    out = store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": 0.2, "currency": "KRW"})
+    assert out["stocks"][0]["paired"]["ratio"] == 0.2
+
+
+def test_set_paired_none_removes_field():
+    wl = store.add_stock({"stocks": []}, ticker="SKHYV", thesis="x")
+    wl = store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"})
+    out = store.set_paired(wl, "SKHYV", None)
+    assert "paired" not in out["stocks"][0]
+
+
+def test_set_paired_validates_ratio_positive():
+    wl = store.add_stock({"stocks": []}, ticker="SKHYV", thesis="x")
+    with pytest.raises(ValueError):
+        store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": 0})
+    with pytest.raises(ValueError):
+        store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": -0.1})
+
+
+def test_set_paired_validates_ticker_non_empty():
+    wl = store.add_stock({"stocks": []}, ticker="SKHYV", thesis="x")
+    with pytest.raises(ValueError):
+        store.set_paired(wl, "SKHYV", {"ticker": "", "ratio": 0.1})
+    with pytest.raises(ValueError):
+        store.set_paired(wl, "SKHYV", {"ratio": 0.1})
+
+
+def test_set_paired_unknown_ticker_raises():
+    with pytest.raises(ValueError):
+        store.set_paired({"stocks": []}, "ZZZ", {"ticker": "000660.KS", "ratio": 0.1})
+
+
+def test_set_paired_preserves_top_level_keys():
+    wl = {"stocks": [], "cash_usd": 7100.0}
+    wl = store.add_stock(wl, ticker="SKHYV", thesis="x")
+    wl = store.set_paired(wl, "SKHYV", {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"})
+    assert wl["cash_usd"] == 7100.0
+    wl = store.set_paired(wl, "SKHYV", None)
+    assert wl["cash_usd"] == 7100.0

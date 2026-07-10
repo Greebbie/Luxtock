@@ -30,7 +30,8 @@ def refresh_data(data_dir: Path) -> dict:
     stocks = load_watchlist(data_dir)["stocks"]
     tickers = [s["ticker"] for s in stocks]
     benchmarks = {s["ticker"]: s["benchmark"] for s in stocks if s.get("benchmark")}
-    quotes = fetch_quotes(tickers, load_json(data_dir / "quotes.json"))
+    paired = {s["ticker"]: s["paired"] for s in stocks if s.get("paired")}
+    quotes = fetch_quotes(tickers, load_json(data_dir / "quotes.json"), paired)
     flows = fetch_flows(tickers, load_json(data_dir / "flows.json"), benchmarks)
     data_dir.mkdir(parents=True, exist_ok=True)
     _write_json(data_dir / "quotes.json", quotes)

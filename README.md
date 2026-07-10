@@ -1,4 +1,4 @@
-# StockLux
+# Luxtock
 
 Local-first equity research workbench. Not a trading bot, not a signal service —
 a disciplined pipeline for analyzing stocks against your own investment theses.
@@ -109,6 +109,6 @@ Analysis policy, strategy, and tooling optimized with **Claude Fable 5**
 
 ## Disclaimer
 
-StockLux produces analysis, not advice. **Not investment advice.** Market data
+Luxtock produces analysis, not advice. **Not investment advice.** Market data
 comes from yfinance (unofficial Yahoo Finance API) with no accuracy guarantee;
 verify against official sources before trading.

@@ -48,7 +48,7 @@ def save_watchlist(data_dir: Path, watchlist: dict) -> None:
 
 
 def add_stock(
-    watchlist: dict, *, ticker: str, thesis: str,
+    watchlist: dict, *, ticker: str, thesis: str = "",
     layer: str = "", name: str = "", note: str = "", holding: bool = False,
     benchmark: str = "",
 ) -> dict:
@@ -59,32 +59,95 @@ def add_stock(
     if any(s["ticker"] == ticker for s in watchlist["stocks"]):
         raise ValueError(f"{ticker} is already on the watchlist")
     entry = {
-        "ticker": ticker, "name": name, "thesis": thesis, "layer": layer,
+        "ticker": ticker, "name": name, "layer": layer,
         "added": datetime.now(timezone.utc).date().isoformat(), "note": note,
         "holding": holding,
     }
+    if thesis:
+        entry["thesis"] = thesis
     if benchmark:
         entry["benchmark"] = benchmark
-    return {"stocks": watchlist["stocks"] + [entry]}
+    return {**watchlist, "stocks": watchlist["stocks"] + [entry]}
 
 
 def set_holding(watchlist: dict, ticker: str, holding: bool) -> dict:
     if not any(s["ticker"] == ticker for s in watchlist["stocks"]):
         raise ValueError(f"{ticker} is not on the watchlist")
-    return {"stocks": [
+    return {**watchlist, "stocks": [
         {**s, "holding": holding} if s["ticker"] == ticker else s
         for s in watchlist["stocks"]
     ]}
 
 
+def set_shares(watchlist: dict, ticker: str, shares: float) -> dict:
+    """Set the optional share count on a holding (0 removes the field).
+
+    Sizing input for `stocklux portfolio` — still no cost basis or P&L,
+    by design.
+    """
+    if shares < 0:
+        raise ValueError(f"shares must be >= 0, got {shares}")
+    if not any(s["ticker"] == ticker for s in watchlist["stocks"]):
+        raise ValueError(f"{ticker} is not on the watchlist")
+
+    def _apply(s: dict) -> dict:
+        if s["ticker"] != ticker:
+            return s
+        if shares == 0:
+            return {k: v for k, v in s.items() if k != "shares"}
+        return {**s, "shares": float(shares)}
+
+    return {**watchlist, "stocks": [_apply(s) for s in watchlist["stocks"]]}
+
+
+def set_paired(watchlist: dict, ticker: str, paired: dict | None) -> dict:
+    """Set/replace/remove the optional paired-listing config on a watchlist
+    entry (None removes it). `paired` = {"ticker", "ratio", "currency"?} where
+    ratio = underlying shares represented by ONE US share (10 ADR = 1 common
+    -> ratio 0.1); currency defaults to "USD" (no FX fetch needed then).
+    """
+    if not any(s["ticker"] == ticker for s in watchlist["stocks"]):
+        raise ValueError(f"{ticker} is not on the watchlist")
+
+    def _apply(s: dict) -> dict:
+        if s["ticker"] != ticker:
+            return s
+        if paired is None:
+            return {k: v for k, v in s.items() if k != "paired"}
+        return {**s, "paired": {
+            "ticker": paired["ticker"],
+            "ratio": float(paired["ratio"]),
+            "currency": paired.get("currency") or "USD",
+        }}
+
+    if paired is not None:
+        paired_ticker = paired.get("ticker")
+        if not paired_ticker:
+            raise ValueError("paired ticker must be non-empty")
+        ratio = paired.get("ratio")
+        if ratio is None or ratio <= 0:
+            raise ValueError(f"paired ratio must be > 0, got {ratio}")
+
+    return {**watchlist, "stocks": [_apply(s) for s in watchlist["stocks"]]}
+
+
+def set_cash(watchlist: dict, cash_usd: float | None) -> dict:
+    """Set the optional top-level cash balance (None removes it)."""
+    if cash_usd is None:
+        return {k: v for k, v in watchlist.items() if k != "cash_usd"}
+    if cash_usd < 0:
+        raise ValueError(f"cash_usd must be >= 0, got {cash_usd}")
+    return {**watchlist, "cash_usd": float(cash_usd)}
+
+
 def remove_stock(watchlist: dict, ticker: str) -> dict:
-    return {"stocks": [s for s in watchlist["stocks"] if s["ticker"] != ticker]}
+    return {**watchlist, "stocks": [s for s in watchlist["stocks"] if s["ticker"] != ticker]}
 
 
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
 
 MEMO_REQUIRED = [
-    "ticker", "date", "thesis", "action", "confidence",
+    "ticker", "date", "action", "confidence",
     "price_at_analysis", "verdict", "thesis_health", "review_trigger",
 ]
 _VERDICTS = ["below_range", "in_range", "above_range"]
@@ -136,6 +199,8 @@ def validate_memo(meta: dict, *, holding: bool | None = None) -> list[str]:
         errors.append(
             f"ticker must be a string (YAML parses bare ON/NO/YES as booleans — "
             f"quote it): {meta['ticker']!r}")
+    if "thesis" in meta and not (isinstance(meta["thesis"], str) and meta["thesis"].strip()):
+        errors.append(f"thesis must be a non-empty string when present: {meta['thesis']!r}")
     if "action" in meta and meta["action"] not in ACTIONS:
         errors.append(f"invalid action: {meta['action']} (must be one of the ten states)")
     if "confidence" in meta and meta["confidence"] not in CONFIDENCE:

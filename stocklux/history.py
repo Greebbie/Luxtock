@@ -38,6 +38,7 @@ def snapshot_rows(quotes: dict, flows: dict) -> list[dict]:
         trend = f.get("trend") if isinstance(f.get("trend"), dict) else {}
         rev = q.get("revisions") if isinstance(q.get("revisions"), dict) else {}
         analyst = q.get("analyst") if isinstance(q.get("analyst"), dict) else {}
+        paired = q.get("paired") if isinstance(q.get("paired"), dict) else {}
         rows.append({
             "date": day,
             "ticker": ticker,
@@ -52,6 +53,7 @@ def snapshot_rows(quotes: dict, flows: dict) -> list[dict]:
             "up_last_30d": rev.get("up_last_30d"),
             "down_last_30d": rev.get("down_last_30d"),
             "pt_mean": analyst.get("pt_mean"),
+            "paired_premium_pct": paired.get("premium_pct"),
         })
     return rows
 

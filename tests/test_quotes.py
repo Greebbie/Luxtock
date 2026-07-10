@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from stocklux import quotes
 
@@ -126,3 +127,141 @@ def test_missing_price_falls_back_to_market_price(monkeypatch):
     monkeypatch.setattr(quotes.yf, "Ticker", NoCurrentPrice)
     out = quotes.fetch_quotes(["SPY"])
     assert out["quotes"]["SPY"]["price"] == 101.5
+
+
+# ---------------------------------------------------------------------------
+# paired-listing premium tracking
+# ---------------------------------------------------------------------------
+
+# SK Hynix ADR real-world example from data/watchlist.json + data/quotes.json:
+# 10 ADR = 1 Seoul common share -> ratio 0.1. US price 171.41, Seoul price
+# 2,180,000 KRW, fx 0.000661 USD per KRW.
+_US_PRICE = 171.41
+_KRW_PRICE = 2_180_000.0
+_FX_KRW_USD = 0.000661
+_RATIO = 0.1
+_EXPECTED_PARITY = _KRW_PRICE * _RATIO * _FX_KRW_USD  # ~144.098
+_EXPECTED_PREMIUM = (_US_PRICE / _EXPECTED_PARITY - 1) * 100  # ~+19.0%
+
+
+class PairedFakeTicker:
+    """Routes yf.Ticker(symbol) to the right fake payload by symbol."""
+
+    _US_INFO = {**GOOD_INFO, "currentPrice": _US_PRICE}
+    _PAIRED_INFO = {"currentPrice": _KRW_PRICE}
+    _FX_INFO = {"regularMarketPrice": _FX_KRW_USD}
+
+    def __init__(self, symbol):
+        self.symbol = symbol
+
+    @property
+    def info(self):
+        if self.symbol in ("FAILPAIR", "FAILFXUSD=X"):
+            raise RuntimeError("fetch down")
+        if self.symbol == "000660.KS":
+            return dict(self._PAIRED_INFO)
+        if self.symbol == "KRWUSD=X":
+            return dict(self._FX_INFO)
+        return dict(self._US_INFO)
+
+
+def test_fetch_quotes_paired_computes_parity_and_premium(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    paired = {"SKHYV": {"ticker": "000660.KS", "ratio": _RATIO, "currency": "KRW"}}
+    out = quotes.fetch_quotes(["SKHYV"], paired=paired)
+    p = out["quotes"]["SKHYV"]["paired"]
+    assert p["ticker"] == "000660.KS"
+    assert p["price"] == pytest.approx(_KRW_PRICE)
+    assert p["currency"] == "KRW"
+    assert p["fx_usd"] == pytest.approx(_FX_KRW_USD)
+    assert p["parity_usd"] == pytest.approx(_EXPECTED_PARITY, rel=1e-4)
+    assert p["premium_pct"] == pytest.approx(_EXPECTED_PREMIUM, rel=1e-3)
+    assert p["premium_pct"] == pytest.approx(19.0, abs=0.1)
+    assert p["fetched_at"]
+
+
+def test_fetch_quotes_without_paired_omits_key(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    out = quotes.fetch_quotes(["MU"])
+    assert "paired" not in out["quotes"]["MU"]
+
+
+def test_fetch_quotes_paired_usd_currency_skips_fx(monkeypatch):
+    calls = []
+
+    class RecordingTicker(PairedFakeTicker):
+        def __init__(self, symbol):
+            calls.append(symbol)
+            super().__init__(symbol)
+
+    monkeypatch.setattr(quotes.yf, "Ticker", RecordingTicker)
+    paired = {"MU": {"ticker": "PEER", "ratio": 1.0, "currency": "USD"}}
+    out = quotes.fetch_quotes(["MU"], paired=paired)
+    p = out["quotes"]["MU"]["paired"]
+    assert p["fx_usd"] == 1.0
+    assert p["currency"] == "USD"
+    assert not any(c.endswith("USD=X") for c in calls)
+
+
+def test_fetch_quotes_paired_defaults_currency_to_usd_when_absent(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    paired = {"MU": {"ticker": "PEER", "ratio": 1.0}}
+    out = quotes.fetch_quotes(["MU"], paired=paired)
+    assert out["quotes"]["MU"]["paired"]["currency"] == "USD"
+
+
+def test_fetch_quotes_paired_ticker_failure_degrades_to_null(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    paired = {"MU": {"ticker": "FAILPAIR", "ratio": 1.0, "currency": "USD"}}
+    out = quotes.fetch_quotes(["MU"], paired=paired)
+    p = out["quotes"]["MU"]["paired"]
+    assert p["price"] is None
+    assert p["parity_usd"] is None
+    assert p["premium_pct"] is None
+    assert p["ticker"] == "FAILPAIR"
+
+
+def test_fetch_quotes_paired_fx_failure_degrades_to_null(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    paired = {"MU": {"ticker": "000660.KS", "ratio": _RATIO, "currency": "FAILFX"}}
+    out = quotes.fetch_quotes(["MU"], paired=paired)
+    p = out["quotes"]["MU"]["paired"]
+    assert p["price"] == pytest.approx(_KRW_PRICE)  # paired ticker itself resolved fine
+    assert p["fx_usd"] is None
+    assert p["parity_usd"] is None
+    assert p["premium_pct"] is None
+
+
+def test_fetch_quotes_paired_fetch_failure_falls_back_to_prior_values(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", PairedFakeTicker)
+    paired = {"MU": {"ticker": "FAILPAIR", "ratio": _RATIO, "currency": "USD"}}
+    prev = {"quotes": {"MU": {"paired": {
+        "ticker": "FAILPAIR", "price": 500.0, "currency": "USD", "fx_usd": 1.0,
+        "parity_usd": 50.0, "premium_pct": 5.0, "fetched_at": "2026-07-01T00:00:00+00:00",
+    }}}}
+    out = quotes.fetch_quotes(["MU"], prev, paired=paired)
+    p = out["quotes"]["MU"]["paired"]
+    assert p["price"] == pytest.approx(500.0)  # stale fetch keeps prior value
+    assert p["parity_usd"] == pytest.approx(500.0 * _RATIO)
+
+
+def test_fetch_quotes_us_ticker_total_failure_keeps_prior_paired_block(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", FakeTicker)  # FAIL raises on .info
+    paired = {"FAIL": {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"}}
+    prev = {"quotes": {"FAIL": {"price": 99.0, "paired": {
+        "ticker": "000660.KS", "price": 2_000_000.0, "currency": "KRW", "fx_usd": 0.0007,
+        "parity_usd": 140.0, "premium_pct": 3.0, "fetched_at": "2026-07-01T00:00:00+00:00",
+    }}}}
+    out = quotes.fetch_quotes(["FAIL"], prev, paired=paired)
+    assert out["quotes"]["FAIL"]["stale"] is True
+    assert out["quotes"]["FAIL"]["paired"]["premium_pct"] == pytest.approx(3.0)
+
+
+def test_fetch_quotes_us_ticker_total_failure_without_prior_paired_gives_nulls(monkeypatch):
+    monkeypatch.setattr(quotes.yf, "Ticker", FakeTicker)
+    paired = {"FAIL": {"ticker": "000660.KS", "ratio": 0.1, "currency": "KRW"}}
+    out = quotes.fetch_quotes(["FAIL"], paired=paired)
+    p = out["quotes"]["FAIL"]["paired"]
+    assert p["ticker"] == "000660.KS"
+    assert p["price"] is None
+    assert p["premium_pct"] is None

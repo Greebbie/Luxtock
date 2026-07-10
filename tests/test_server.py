@@ -40,6 +40,19 @@ def test_overview_flags_holding_action_mismatch(data_dir):
     assert any("holding" in e for e in on["memo_errors"])
 
 
+def test_overview_renders_row_without_thesis(data_dir):
+    # a watchlist entry with no `thesis` key must not crash build_overview
+    # and the row must simply omit the field
+    wl = json.loads((data_dir / "watchlist.json").read_text(encoding="utf-8"))
+    del wl["stocks"][1]["thesis"]  # CHPT
+    (data_dir / "watchlist.json").write_text(json.dumps(wl), encoding="utf-8")
+    ov = build_overview(data_dir)
+    chpt = next(r for r in ov["rows"] if r["ticker"] == "CHPT")
+    assert "thesis" not in chpt
+    res = client(data_dir).get("/api/overview")
+    assert res.status_code == 200
+
+
 def test_get_overview_endpoint(data_dir):
     res = client(data_dir).get("/api/overview")
     assert res.status_code == 200
@@ -90,6 +103,20 @@ def test_add_stock_endpoint_validates_thesis(data_dir):
     assert any(s["ticker"] == "WOLF" for s in store.load_watchlist(data_dir)["stocks"])
 
 
+def test_add_stock_endpoint_without_thesis_succeeds(data_dir):
+    c = client(data_dir)
+    # thesis omitted entirely from the body
+    res = c.post("/api/watchlist", json={"ticker": "WOLF", "layer": "power-semis"})
+    assert res.status_code == 200
+    entry = next(s for s in store.load_watchlist(data_dir)["stocks"] if s["ticker"] == "WOLF")
+    assert "thesis" not in entry
+    # explicit empty string is also accepted (no validation against data/theses/)
+    res2 = c.post("/api/watchlist", json={"ticker": "SMCI", "thesis": ""})
+    assert res2.status_code == 200
+    entry2 = next(s for s in store.load_watchlist(data_dir)["stocks"] if s["ticker"] == "SMCI")
+    assert "thesis" not in entry2
+
+
 def test_add_stock_endpoint_rejects_bad_ticker(data_dir):
     res = client(data_dir).post("/api/watchlist",
                                  json={"ticker": "bad!!", "thesis": "ev-adoption"})
@@ -120,13 +147,22 @@ def test_status_returns_data_version(data_dir):
 def test_static_dashboard_served(data_dir):
     res = client(data_dir).get("/")
     assert res.status_code == 200
-    assert "StockLux" in res.text
+    assert "Luxtock" in res.text
 
 
 def test_static_assets_served(data_dir):
     c = client(data_dir)
     assert c.get("/app.js").status_code == 200
     assert c.get("/style.css").status_code == 200
+
+
+def test_all_responses_carry_no_cache_header(data_dir):
+    # without Cache-Control the browser heuristically caches the SPA and
+    # users see a stale dashboard after upgrades; no-cache forces
+    # revalidation (304 when unchanged — cheap, always current)
+    c = client(data_dir)
+    for path in ("/", "/app.js", "/style.css", "/api/overview"):
+        assert c.get(path).headers.get("cache-control") == "no-cache", path
 
 
 def _write_high_confidence_memo(data_dir, memo_date="2026-06-20"):
@@ -166,12 +202,41 @@ def test_high_confidence_on_stale_audit_flagged(data_dir):
     assert any("audit is" in e and "days older" in e for e in on["memo_errors"])
 
 
+def test_high_confidence_thesis_independent_scenario_not_flagged(data_dir):
+    # a memo that declares scenario_thesis_independent: true derives every
+    # scenario input from market data, so the unaudited-thesis cap does not
+    # bind even at high confidence (methodology: "Scenario independence rule")
+    _write_high_confidence_memo(data_dir)
+    p = data_dir / "analyses" / "ON" / "2026-06-20.md"
+    memo = p.read_text(encoding="utf-8").replace(
+        "confidence: high", "confidence: high\nscenario_thesis_independent: true")
+    p.write_text(memo, encoding="utf-8")
+    ov = build_overview(data_dir)
+    on = next(r for r in ov["rows"] if r["ticker"] == "ON")
+    assert not any("audit" in e for e in on["memo_errors"])
+
+
 def test_medium_confidence_on_unaudited_thesis_not_flagged(data_dir):
     # the fixture memo is confidence: medium on a never-audited thesis — the
     # cap is already respected, so no warning
     ov = build_overview(data_dir)
     on = next(r for r in ov["rows"] if r["ticker"] == "ON")
     assert not any("audit" in e for e in on["memo_errors"])
+
+
+def test_high_confidence_memo_without_thesis_key_not_flagged(data_dir):
+    # a memo with no `thesis` key has nothing to audit against — the
+    # freshness cap must not fire even at confidence: high
+    _write_high_confidence_memo(data_dir)
+    p = data_dir / "analyses" / "ON" / "2026-06-20.md"
+    memo = p.read_text(encoding="utf-8")
+    lines = [ln for ln in memo.splitlines() if not ln.startswith("thesis:")]
+    p.write_text("\n".join(lines), encoding="utf-8")
+    ov = build_overview(data_dir)
+    on = next(r for r in ov["rows"] if r["ticker"] == "ON")
+    assert on["memo"]["confidence"] == "high"
+    assert not any("audit" in e for e in on["memo_errors"])
+    assert not any("thesis" in e for e in on["memo_errors"])
 
 
 def _write_memo_with_mode(data_dir, memo_date, mode):
@@ -206,3 +271,57 @@ def test_overview_includes_price_targets(data_dir):
     res = client(data_dir).get("/api/overview")
     mu = next(r for r in res.json()["rows"] if r["ticker"] == "ON")
     assert mu["memo"]["price_targets"]["base"] == 48
+
+
+def test_get_quant_endpoint_missing_file_returns_empty_shape(data_dir):
+    # fixture data_dir has no quant.json — endpoint must not 500
+    res = client(data_dir).get("/api/quant")
+    assert res.status_code == 200
+    assert res.json() == {"computed_at": None, "tickers": {}}
+
+
+def test_get_quant_endpoint_returns_file_contents(data_dir):
+    quant = {
+        "computed_at": "2026-07-10T18:52:07.837756+00:00",
+        "tickers": {
+            "ON": {
+                "features": {"price": 1032.0},
+                "scores": {"composite": 85.3, "band": "strong", "coverage": 0.86},
+            }
+        },
+    }
+    (data_dir / "quant.json").write_text(json.dumps(quant), encoding="utf-8")
+    res = client(data_dir).get("/api/quant")
+    assert res.status_code == 200
+    assert res.json() == quant
+
+
+def test_get_portfolio_endpoint_empty_when_no_holdings(data_dir):
+    # fixture watchlist has no `holding: true` entries and no shares/cash_usd
+    res = client(data_dir).get("/api/portfolio")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["positions"] == []
+    assert body["cash_usd"] == 0.0
+    assert body["total_value"] == 0.0
+    assert body["groups"] == {"by_layer": {}, "by_thesis": {}}
+    assert body["flags"] == []
+    assert body["bear_stress"]["covered_tickers"] == []
+
+
+def test_get_portfolio_endpoint_with_sized_holdings(data_dir):
+    wl = json.loads((data_dir / "watchlist.json").read_text(encoding="utf-8"))
+    wl["cash_usd"] = 500.0
+    wl["stocks"][0]["holding"] = True  # ON
+    wl["stocks"][0]["shares"] = 10.0
+    (data_dir / "watchlist.json").write_text(json.dumps(wl), encoding="utf-8")
+    res = client(data_dir).get("/api/portfolio")
+    assert res.status_code == 200
+    body = res.json()
+    on = next(p for p in body["positions"] if p["ticker"] == "ON")
+    assert on["shares"] == 10.0
+    assert on["value"] == 10320.0
+    assert body["cash_usd"] == 500.0
+    assert body["total_value"] == 10820.0
+    assert body["groups"]["by_layer"]["power-semis"] > 0
+    assert "bear_stress" in body

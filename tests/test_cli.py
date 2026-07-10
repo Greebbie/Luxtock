@@ -11,10 +11,10 @@ runner = CliRunner()
 def test_help_lists_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "StockLux" in result.output
+    assert "Luxtock" in result.output
 
 
-def _fake_quotes(tickers, prev=None):
+def _fake_quotes(tickers, prev=None, paired=None):
     return {"fetched_at": "2026-07-04T00:00:00+00:00",
             "quotes": {t: {"price": 100.0, "ttm_pe": 20.0, "fwd_pe": 10.0, "stale": False}
                        for t in tickers}}
@@ -99,6 +99,18 @@ def test_add_unknown_thesis_fails(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["add", "CHPT", "--thesis", "nope"])
     assert result.exit_code == 1
+
+
+def test_add_without_thesis_succeeds(tmp_path, monkeypatch):
+    d = _setup_data(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["add", "chpt", "--layer", "charging"])
+    assert result.exit_code == 0, result.output
+    wl = store.load_watchlist(d)
+    entry = next(s for s in wl["stocks"] if s["ticker"] == "CHPT")
+    assert "thesis" not in entry
+    # confirmation echoes without a thesis suffix
+    assert result.output.strip() == "added CHPT"
 
 
 def test_quotes_stale(tmp_path):

@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from stocklux import history
 
 
@@ -55,3 +57,24 @@ def test_append_accumulates_across_days(tmp_path):
 def test_corrupt_line_does_not_break_append(tmp_path):
     (tmp_path / "history.jsonl").write_text("not json\n", encoding="utf-8")
     assert history.append_history(tmp_path, *make_payloads()) == 1
+
+
+# ---------------------------------------------------------------------------
+# paired_premium_pct
+# ---------------------------------------------------------------------------
+
+
+def test_snapshot_rows_includes_paired_premium_pct_when_present():
+    quotes, flows = make_payloads()
+    quotes["quotes"]["MU"]["paired"] = {
+        "ticker": "000660.KS", "price": 2_180_000.0, "currency": "KRW",
+        "fx_usd": 0.000661, "parity_usd": 144.098, "premium_pct": 18.95,
+        "fetched_at": "2026-07-05T16:00:00+00:00",
+    }
+    rows = history.snapshot_rows(quotes, flows)
+    assert rows[0]["paired_premium_pct"] == pytest.approx(18.95)
+
+
+def test_snapshot_rows_paired_premium_pct_null_when_absent():
+    rows = history.snapshot_rows(*make_payloads())
+    assert rows[0]["paired_premium_pct"] is None
