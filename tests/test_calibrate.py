@@ -1,7 +1,7 @@
 import json
 from datetime import date
 
-from stocklux import calibrate
+from luxtock import calibrate
 
 AS_OF = date(2025, 1, 15)  # > memo_date 2024-01-01 + 365d (2024-12-31) => matured
 

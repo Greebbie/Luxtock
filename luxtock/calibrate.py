@@ -2,9 +2,9 @@
 
 Grades matured memo price targets against realized history and tracks
 immature memos so the ledger is useful from day one. Pure/deterministic:
-reads memo frontmatter (via stocklux.store), data/history.jsonl and
+reads memo frontmatter (via luxtock.store), data/history.jsonl and
 data/quotes.json, never mutates its inputs. See framework/quant.md
-"Module 3 — stocklux/calibrate.py" for the spec this implements.
+"Module 3 — luxtock/calibrate.py" for the spec this implements.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from stocklux import store
+from luxtock import store
 
 MATURITY_DAYS = 365
 REALIZED_MATCH_WINDOW_DAYS = 14

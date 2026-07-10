@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from stocklux.export import export_memo, render_html
-from stocklux import store
+from luxtock.export import export_memo, render_html
+from luxtock import store
 
 
 def test_export_memo_writes_selfcontained_html(data_dir, tmp_path):

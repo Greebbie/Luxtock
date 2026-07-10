@@ -1,5 +1,5 @@
 [project]
-name = "stocklux"
+name = "luxtock"
 version = "0.1.0"
 description = "Local-first equity research workbench: file-based data layer, LLM-agnostic analysis, calm research dashboard"
 requires-python = ">=3.10"
@@ -18,17 +18,17 @@ dependencies = [
 dev = ["pytest>=8.0", "httpx>=0.27"]
 
 [project.scripts]
-stocklux = "stocklux.cli:main"
+luxtock = "luxtock.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["stocklux*"]
+include = ["luxtock*"]
 
 [tool.setuptools.package-data]
-stocklux = ["web/*"]
+luxtock = ["web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

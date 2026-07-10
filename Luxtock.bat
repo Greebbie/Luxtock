@@ -1,5 +1,5 @@
 @echo off
-rem StockLux dashboard launcher — double-click to open http://127.0.0.1:8321
+rem Luxtock dashboard launcher — double-click to open http://127.0.0.1:8321
 rem If the server is already running, this just opens a browser tab.
 rem Otherwise it starts the server here; closing this window stops it.
 cd /d "%~dp0"
@@ -10,15 +10,15 @@ if %errorlevel%==0 (
     exit /b 0
 )
 
-where stocklux >nul 2>&1
+where luxtock >nul 2>&1
 if %errorlevel%==0 (
-    stocklux ui
+    luxtock ui
     goto :eof
 )
 
-python -m stocklux ui
+python -m luxtock ui
 if errorlevel 1 (
     echo.
-    echo stocklux is not installed. From this folder run:  pip install -e .
+    echo luxtock is not installed. From this folder run:  pip install -e .
     pause
 )

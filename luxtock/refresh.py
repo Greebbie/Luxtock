@@ -41,7 +41,7 @@ def refresh_data(data_dir: Path) -> dict:
 
 
 def quotes_stale(data_dir: Path, hours: float = 12) -> bool:
-    # 12h is the CLI's auto-refresh threshold (stocklux ui). The methodology's
+    # 12h is the CLI's auto-refresh threshold (luxtock ui). The methodology's
     # 24h rule is a different gate: it is where an *agent* must stop and ask
     # the user to refresh. Intentionally stricter here — cheap to refresh
     # early, expensive to analyze on stale data.

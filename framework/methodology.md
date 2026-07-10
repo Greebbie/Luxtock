@@ -1,4 +1,4 @@
-# StockLux Analysis Methodology
+# Luxtock Analysis Methodology
 
 Any agent working in this repository must read this file in full before doing
 any analysis. It defines the output discipline, the eight analysis dimensions,
@@ -54,7 +54,7 @@ advice — call it exactly as it is.**
    information too.
 7. **Price figures must always be quoted from `data/quotes.json`** (to stay
    consistent with the dashboard) — do not look up prices online yourself. If
-   `fetched_at` is more than 24 hours old, run `stocklux refresh` yourself
+   `fetched_at` is more than 24 hours old, run `luxtock refresh` yourself
    before continuing (prompt the user only if your environment cannot execute
    shell commands). The only exception: candidates
    surfaced by the discover flow that are **not yet on the watchlist** are not
@@ -138,7 +138,7 @@ the Summary section (and in the entry plan when one exists). Scores time
 and size entries; they never override the verdict precedence rules, and
 the analyst never recomputes or adjusts them.
 
-**History note**: every `stocklux refresh` appends per-ticker snapshots
+**History note**: every `luxtock refresh` appends per-ticker snapshots
 (price, short interest, revision momentum, trend readings) to
 `data/history.jsonl`. Once it has depth, cite *changes* from it — "short
 interest +40% in two weeks" is a stronger flows signal than any single

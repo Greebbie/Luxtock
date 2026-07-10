@@ -144,7 +144,7 @@ def render_html(memo: dict, quote: dict | None, quant_data: dict | None = None) 
 <html lang="en"><head><meta charset="utf-8">
 <title>{meta.get('ticker', '')} · {meta.get('date', '')} · Luxtock</title>
 <style>{_CSS}</style></head><body>
-<div class="meta-line">STOCKLUX · thesis: {meta.get('thesis', '—')} · layer:
+<div class="meta-line">LUXTOCK · thesis: {meta.get('thesis', '—')} · layer:
 {meta.get('layer', '—')} · {meta.get('date', '')}</div>
 <div class="verdict-card">{card}</div>
 {body_html}
@@ -179,7 +179,7 @@ def _print_to_pdf(html_path: Path, pdf_path: Path) -> tuple[str | None, str | No
 
     Returns (pdf_path_str, None) on success or (None, error_message) on
     failure — the shared {"pdf", "pdf_error"} contract used by export_memo
-    and (via reuse) stocklux.report.export_report. Extracted, unchanged in
+    and (via reuse) luxtock.report.export_report. Extracted, unchanged in
     behavior, so it can be imported instead of duplicated.
     """
     browser = _find_browser()

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from stocklux import flows
+from luxtock import flows
 
 
 def make_history(up_volume: int, down_volume: int, days: int = 120) -> pd.DataFrame:

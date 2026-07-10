@@ -19,11 +19,11 @@ these caps are the self-declared limits that make "high risk" survivable.
 
 ## Cadence
 
-- Weekly (or after any ±10% move in a holding): `stocklux refresh` →
-  `stocklux quant` → `stocklux portfolio`. Act only on changed bands,
+- Weekly (or after any ±10% move in a holding): `luxtock refresh` →
+  `luxtock quant` → `luxtock portfolio`. Act only on changed bands,
   flags, or fired review triggers — not on mood.
-- Every memo write/update ends with `stocklux export <T> --pdf`.
-- Quarterly: `stocklux calibrate` + the retrospect playbook.
+- Every memo write/update ends with `luxtock export <T> --pdf`.
+- Quarterly: `luxtock calibrate` + the retrospect playbook.
 
 ## Entry rules
 
@@ -40,7 +40,7 @@ these caps are the self-declared limits that make "high risk" survivable.
 - Single name ≤ 25% of account at cost of entry.
 - One theme/layer group ≤ 60% (owner-declared aggressive setting; the
   tool flags at 40/60).
-- Portfolio bear-stress drawdown ≤ 30%: if `stocklux portfolio` stress
+- Portfolio bear-stress drawdown ≤ 30%: if `luxtock portfolio` stress
   exceeds it, the next action must reduce it, not add to it.
 
 ## Exit / defense rules

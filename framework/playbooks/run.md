@@ -9,7 +9,7 @@ Read `framework/methodology.md` first. Report in English.
 
 ### 1. Refresh hard data
 
-Run `stocklux refresh` yourself if quotes are stale (>24h) — it is
+Run `luxtock refresh` yourself if quotes are stale (>24h) — it is
 deterministic code, not a judgment call. Only fall back to prompting the
 user when the environment cannot execute shell commands.
 
@@ -62,7 +62,7 @@ One consolidated summary, in this order:
   good-buy range vs. price / entry plan if written
 - anything queued beyond the batch cap
 - retrospect highlights (hit rate, biggest bias) if one ran
-- a final line: "dashboard is current — `StockLux.bat` / `stocklux ui`"
+- a final line: "dashboard is current — `Luxtock.bat` / `luxtock ui`"
 
 ## What this playbook never does
 

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stocklux import history
+from luxtock import history
 
 
 def make_payloads(day="2026-07-05", price=975.56, stale=False):

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stocklux import check
+from luxtock import check
 
 
 def _write_watchlist(data_dir, stocks, cash_usd=None):

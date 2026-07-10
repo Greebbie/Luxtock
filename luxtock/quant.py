@@ -13,7 +13,7 @@ import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from stocklux import store
+from luxtock import store
 
 QUANT_FILE = "quant.json"
 

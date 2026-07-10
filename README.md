@@ -10,7 +10,7 @@ and a calibration ledger that grades them when they mature.
 ```
 ┌────────────────┐      ┌──────────────────┐      ┌──────────────────┐
 │ any LLM agent  │      │      data/       │      │   dashboard      │
-│ Claude / Codex │─────▶│ watchlist.json   │◀─────│  stocklux ui     │
+│ Claude / Codex │─────▶│ watchlist.json   │◀─────│  luxtock ui     │
 │ Gemini / ...   │write │ analyses/**.md   │ read │  (localhost)     │
 └────────────────┘      │ quotes/flows/    │      └──────────────────┘
                         │ quant/calibration│◀── deterministic code
@@ -25,9 +25,9 @@ and a calibration ledger that grades them when they mature.
   tool itself calls no LLM and holds no API keys.
 - **Analysis, not your book.** No positions, weights, or P&L in any
   analysis view. An optional `shares`/`cash` sizing input exists solely
-  for the standalone concentration/stress check (`stocklux portfolio`).
+  for the standalone concentration/stress check (`luxtock portfolio`).
 - **Calibrated over time.** Every memo's bear/base/bull targets carry
-  probabilities; `stocklux calibrate` Brier-scores them at maturity.
+  probabilities; `luxtock calibrate` Brier-scores them at maturity.
   Win rates are measured, never asserted.
 
 ## Quick start
@@ -35,26 +35,26 @@ and a calibration ledger that grades them when they mature.
 ```bash
 pip install -e .
 mkdir -p data && cp -r examples/. data/    # Windows: xcopy /E /I examples data\
-stocklux refresh                           # quotes + flows + history
-stocklux quant                             # factor vector + setup scores
-stocklux ui                                # dashboard → http://127.0.0.1:8321
+luxtock refresh                           # quotes + flows + history
+luxtock quant                             # factor vector + setup scores
+luxtock ui                                # dashboard → http://127.0.0.1:8321
 ```
 
-Windows: double-click **`StockLux.bat`** to open/start the dashboard.
+Windows: double-click **`Luxtock.bat`** to open/start the dashboard.
 
 ## CLI (plain commands — usable from any shell, agent, or cron)
 
 | command | purpose |
 |---|---|
-| `stocklux refresh` | fetch quotes/flows (+ paired-listing premium), append history |
-| `stocklux quant` | 23-feature vector + transparent setup score per ticker → `data/quant.json` |
-| `stocklux check` | price alerts vs memo levels (tranches, invalidation, trim, bear/bull); exit 1 on alert |
-| `stocklux report --pdf` | one desk-level HTML/PDF: quant table, all verdicts, alerts, calibration |
-| `stocklux export <T> --pdf` | single-name report: full memo + quant snapshot |
-| `stocklux calibrate` | Brier ledger for matured targets + tracking for immature ones |
-| `stocklux portfolio` | optional concentration & bear-stress check over sized holdings |
-| `stocklux add / hold / shares / cash / pair` | watchlist and sizing/pairing inputs |
-| `stocklux ui` | live dashboard (per-stock expandable: factors, risk/reward, full memo) |
+| `luxtock refresh` | fetch quotes/flows (+ paired-listing premium), append history |
+| `luxtock quant` | 23-feature vector + transparent setup score per ticker → `data/quant.json` |
+| `luxtock check` | price alerts vs memo levels (tranches, invalidation, trim, bear/bull); exit 1 on alert |
+| `luxtock report --pdf` | one desk-level HTML/PDF: quant table, all verdicts, alerts, calibration |
+| `luxtock export <T> --pdf` | single-name report: full memo + quant snapshot |
+| `luxtock calibrate` | Brier ledger for matured targets + tracking for immature ones |
+| `luxtock portfolio` | optional concentration & bear-stress check over sized holdings |
+| `luxtock add / hold / shares / cash / pair` | watchlist and sizing/pairing inputs |
+| `luxtock ui` | live dashboard (per-stock expandable: factors, risk/reward, full memo) |
 
 Analyses run from any agent CLI:
 
@@ -101,7 +101,7 @@ live in `framework/operating-contract.md`.
 
 ```
 framework/    methodology, quant spec, operating contract, 6 playbooks
-stocklux/     Python package: CLI, fetchers, quant/report modules, FastAPI dashboard
+luxtock/     Python package: CLI, fetchers, quant/report modules, FastAPI dashboard
 examples/     starter data
 data/         private layer (gitignored): watchlist, memos, quant/calibration ledgers
 output/       exported reports (gitignored)

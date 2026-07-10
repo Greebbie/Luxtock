@@ -1,4 +1,4 @@
-# StockLux — Agent Integration Guide
+# Luxtock — Agent Integration Guide
 
 This repository is a personal investment research desk. Your job (as an LLM
 agent) is to **run playbooks** and write the results back to structured
@@ -33,7 +33,7 @@ playbook below.
 
 1. Price/P-E figures must always be quoted from `data/quotes.json` — never
    look up prices online yourself. If the data is more than 24 hours old,
-   run `stocklux refresh` yourself (it is deterministic code); prompt the
+   run `luxtock refresh` yourself (it is deterministic code); prompt the
    user only when your environment cannot execute shell commands. The only
    exception (consistent
    with the methodology): candidates surfaced by the discover flow that are
@@ -60,7 +60,7 @@ playbook below.
 ## Data layout
 
 - `data/watchlist.json` — the tracked list; entries may carry an optional
-  `holding: true` flag (`stocklux hold <TICKER>`) marking names the user
+  `holding: true` flag (`luxtock hold <TICKER>`) marking names the user
   actually owns — no share counts or P&L, by design
 - `data/theses/*.md` — the **desk's working hypotheses** (analyst-owned,
   audited by the audit playbook). Attached to a name only when a shared
@@ -74,17 +74,17 @@ playbook below.
 - `data/quotes.json` / `data/flows.json` — deterministically fetched hard
   data, read-only
 - `data/history.jsonl` — append-only per-ticker snapshot log written by
-  `stocklux refresh` (price, short interest, revision momentum, trend);
+  `luxtock refresh` (price, short interest, revision momentum, trend);
   read-only for agents — cite it for *changes over time* and for
   retrospect path grading. It grows forever by design: **filter it**
   (grep by ticker, tail by date) — never load the whole file into context
 - `data/quant.json` — deterministic feature vector + setup scores per
-  ticker, written by `stocklux quant` (spec: `framework/quant.md`).
+  ticker, written by `luxtock quant` (spec: `framework/quant.md`).
   Read-only for agents: cite the numbers, never recompute or restyle them.
   Memos dated on/after 2026-07-12 cite the snapshot in their Summary and
   entry plan.
 - `data/calibration.json` — probability ledger written by
-  `stocklux calibrate`: Brier scores for matured price targets + a
+  `luxtock calibrate`: Brier scores for matured price targets + a
   tracking table for immature ones. Read-only for agents; the retrospect
   playbook is its consumer.
 
@@ -96,16 +96,16 @@ lives in plain files under `data/`.
 
 | command | purpose |
 |---|---|
-| `stocklux refresh` | fetch quotes/flows (+ paired-listing parity & premium), append history |
-| `stocklux add <T> --thesis <id>` / `hold` / `shares <T> <N>` / `cash <N>` | watchlist, holding flag, position sizing |
-| `stocklux pair <T> <HOME_TICKER> --ratio R --currency C` | pair a US listing with its home-market line (premium tracked on refresh) |
-| `stocklux quant` | feature vector + setup scores → `data/quant.json` (spec: `framework/quant.md`) |
-| `stocklux portfolio` | concentration & bear-stress report + flags |
-| `stocklux check` | price alerts vs memo levels + portfolio flags; exit 1 when any alert (cron-friendly) |
-| `stocklux calibrate` | Brier ledger for matured targets + tracking table → `data/calibration.json` |
-| `stocklux export <T> --pdf` | self-contained HTML/PDF report of the latest memo + quant snapshot |
-| `stocklux report --pdf` | ONE desk-level HTML/PDF: portfolio, quant table, all verdicts, alerts, calibration |
-| `stocklux ui` | live dashboard (reads `data/` directly) |
+| `luxtock refresh` | fetch quotes/flows (+ paired-listing parity & premium), append history |
+| `luxtock add <T> --thesis <id>` / `hold` / `shares <T> <N>` / `cash <N>` | watchlist, holding flag, position sizing |
+| `luxtock pair <T> <HOME_TICKER> --ratio R --currency C` | pair a US listing with its home-market line (premium tracked on refresh) |
+| `luxtock quant` | feature vector + setup scores → `data/quant.json` (spec: `framework/quant.md`) |
+| `luxtock portfolio` | concentration & bear-stress report + flags |
+| `luxtock check` | price alerts vs memo levels + portfolio flags; exit 1 when any alert (cron-friendly) |
+| `luxtock calibrate` | Brier ledger for matured targets + tracking table → `data/calibration.json` |
+| `luxtock export <T> --pdf` | self-contained HTML/PDF report of the latest memo + quant snapshot |
+| `luxtock report --pdf` | ONE desk-level HTML/PDF: portfolio, quant table, all verdicts, alerts, calibration |
+| `luxtock ui` | live dashboard (reads `data/` directly) |
 
 The operator's mechanical rules live in `framework/operating-contract.md`.
 
@@ -115,6 +115,6 @@ The operator's mechanical rules live in `framework/operating-contract.md`.
 pip install -e .
 mkdir -p data && cp -r examples/. data/   # sample watchlist + thesis + one memo
 # Windows: xcopy /E /I examples data\
-stocklux refresh              # fetch quotes
-stocklux ui                   # open the research desk
+luxtock refresh              # fetch quotes
+luxtock ui                   # open the research desk
 ```

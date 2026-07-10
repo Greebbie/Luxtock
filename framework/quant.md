@@ -1,4 +1,4 @@
-# StockLux Quant Layer — Specification v1
+# Luxtock Quant Layer — Specification v1
 
 The quant layer turns the desk's hard data into **deterministic, reproducible
 numbers**: a per-ticker feature vector, a transparent setup score, a
@@ -18,11 +18,11 @@ analyst's probabilities once targets mature. Design principles (retail-fit):
    *setup quality* number (is this a good moment/price to act), not a
    company quality number. The memo verdict machinery stays in charge.
 5. **Uncalibrated until proven otherwise.** All weights below are v1 priors.
-   The calibration ledger (`stocklux calibrate`) exists to grade and revise
+   The calibration ledger (`luxtock calibrate`) exists to grade and revise
    them; until it has depth, treat bands as ordinal (higher = better), not
    as probabilities.
 
-## Module 1 — `stocklux/quant.py` (features + setup score)
+## Module 1 — `luxtock/quant.py` (features + setup score)
 
 ### Inputs
 - `data/quotes.json`, `data/flows.json` (latest snapshot)
@@ -91,10 +91,10 @@ only). `components_used` lists which sub-scores fed the composite.
  "scores": {"valuation": ..., "momentum": ..., "positioning": ...,
  "trend": ..., "composite": ..., "band": "fair", "coverage": 0.9}}}}
 ```
-CLI `stocklux quant` prints one row per ticker (price, gap, EV, composite,
+CLI `luxtock quant` prints one row per ticker (price, gap, EV, composite,
 band, coverage) and writes the file.
 
-## Module 2 — `stocklux/portfolio.py` (concentration & stress)
+## Module 2 — `luxtock/portfolio.py` (concentration & stress)
 
 - `data/watchlist.json` entries gain an optional `shares` (float ≥ 0) and
   the top level an optional `cash_usd` (float). No cost basis, no P&L —
@@ -109,10 +109,10 @@ band, coverage) and writes the file.
 - Bear stress: for each sized holding with a latest-memo bear target,
   stressed value = shares × bear; unsized/missing-target names carry at
   current value; report portfolio drawdown % vs current.
-- Output: dict from `portfolio_report(data_dir)`; CLI `stocklux portfolio`
+- Output: dict from `portfolio_report(data_dir)`; CLI `luxtock portfolio`
   renders a table + flags.
 
-## Module 3 — `stocklux/calibrate.py` (probability ledger)
+## Module 3 — `luxtock/calibrate.py` (probability ledger)
 
 - A memo is **matured** when memo date + 365 ≤ as_of date and it carries
   full price_targets.
@@ -128,7 +128,7 @@ band, coverage) and writes the file.
   position within [bear, bull] as a percentile, and whether it is above/
   below base — so the ledger is useful from day one.
 - Output `data/calibration.json` {as_of, matured: [...], tracking: [...],
-  aggregate: {n, mean_brier}}; CLI `stocklux calibrate`. Empty-safe: with
+  aggregate: {n, mean_brier}}; CLI `luxtock calibrate`. Empty-safe: with
   0 matured memos it reports n=0 and the tracking table only.
 
 ## Memo contract hook
@@ -152,7 +152,7 @@ they never override the verdict precedence rules.
   **Informational only — not in any sub-score** (per governance); it is
   the timing indicator for dual-listed names (e.g. an ADR vs. its
   home-market line).
-- `stocklux check` (2026-07-12): stateless price alerts vs the latest
+- `luxtock check` (2026-07-12): stateless price alerts vs the latest
   memo's entry tranches / invalidation / trim threshold (1.25× good-buy
   ceiling, holding only) / bear / bull, plus portfolio flags; exit code 1
   when any alert is active. Re-fires every run by design.

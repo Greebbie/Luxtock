@@ -82,7 +82,7 @@ def set_holding(watchlist: dict, ticker: str, holding: bool) -> dict:
 def set_shares(watchlist: dict, ticker: str, shares: float) -> dict:
     """Set the optional share count on a holding (0 removes the field).
 
-    Sizing input for `stocklux portfolio` — still no cost basis or P&L,
+    Sizing input for `luxtock portfolio` — still no cost basis or P&L,
     by design.
     """
     if shares < 0:
@@ -194,7 +194,7 @@ def validate_memo(meta: dict, *, holding: bool | None = None) -> list[str]:
     if holding is False and action in HOLDING_ONLY_ACTIONS:
         errors.append(
             f"action '{action}' requires holding=true on the watchlist entry "
-            f"(set it with `stocklux hold <TICKER>`)")
+            f"(set it with `luxtock hold <TICKER>`)")
     if "ticker" in meta and not isinstance(meta["ticker"], str):
         errors.append(
             f"ticker must be a string (YAML parses bare ON/NO/YES as booleans — "

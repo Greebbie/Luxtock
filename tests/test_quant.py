@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stocklux import quant
+from luxtock import quant
 
 
 def blank_features(**overrides) -> dict:
@@ -501,7 +501,7 @@ def quant_data_dir(tmp_path):
 
 
 def test_build_quant_writes_and_returns_matching_dict(quant_data_dir):
-    from stocklux import quant as quant_mod
+    from luxtock import quant as quant_mod
 
     result = quant_mod.build_quant(quant_data_dir)
 

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stocklux import store
+from luxtock import store
 
 
 def test_load_watchlist_missing_returns_empty(tmp_path):

@@ -42,7 +42,7 @@ report in English.
 
 - Write pre-confirmation candidates to the watchlist: for each selected name,
   make an equivalent data change to running
-  `stocklux add <TICKER> --thesis <id> --layer <layer> --note "discover: <one-line rationale>"`
+  `luxtock add <TICKER> --thesis <id> --layer <layer> --note "discover: <one-line rationale>"`
   (editing `data/watchlist.json` directly is fine too, as long as the fields
   stay consistent).
 - Report the list back to the user, noting: these are **candidates only** —

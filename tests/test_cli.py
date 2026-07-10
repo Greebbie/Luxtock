@@ -2,8 +2,8 @@ import json
 
 from typer.testing import CliRunner
 
-from stocklux import refresh, store
-from stocklux.cli import app
+from luxtock import refresh, store
+from luxtock.cli import app
 
 runner = CliRunner()
 
@@ -38,8 +38,8 @@ def _setup_data(tmp_path):
 def test_refresh_writes_files(tmp_path, monkeypatch):
     d = _setup_data(tmp_path)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("stocklux.refresh.fetch_quotes", _fake_quotes)
-    monkeypatch.setattr("stocklux.refresh.fetch_flows", _fake_flows)
+    monkeypatch.setattr("luxtock.refresh.fetch_quotes", _fake_quotes)
+    monkeypatch.setattr("luxtock.refresh.fetch_flows", _fake_flows)
     result = runner.invoke(app, ["refresh"])
     assert result.exit_code == 0, result.output
     q = json.loads((d / "quotes.json").read_text(encoding="utf-8"))
@@ -129,8 +129,8 @@ def test_ui_starts_server(tmp_path, monkeypatch):
     def fake_run(app_obj, host, port):
         called["host"], called["port"] = host, port
 
-    monkeypatch.setattr("stocklux.cli.uvicorn.run", fake_run)
-    monkeypatch.setattr("stocklux.refresh.refresh_data", lambda dd: {})
+    monkeypatch.setattr("luxtock.cli.uvicorn.run", fake_run)
+    monkeypatch.setattr("luxtock.refresh.refresh_data", lambda dd: {})
     result = runner.invoke(app, ["ui", "--no-browser", "--port", "9999"])
     assert result.exit_code == 0, result.output
     assert called == {"host": "127.0.0.1", "port": 9999}

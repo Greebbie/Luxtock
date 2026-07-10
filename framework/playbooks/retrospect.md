@@ -15,9 +15,9 @@ English.
 ## Preconditions
 
 1. Read `data/quotes.json`; if `fetched_at` is more than 24 hours old, run
-   `stocklux refresh` yourself, then re-read (prompt the user only if you
+   `luxtock refresh` yourself, then re-read (prompt the user only if you
    cannot execute shell commands).
-2. Run `stocklux calibrate` and read `data/calibration.json` — the
+2. Run `luxtock calibrate` and read `data/calibration.json` — the
    deterministic ledger (realized tiers, Brier scores, MAE/MFE, the
    tracking table for immature memos) is the numeric backbone of this
    playbook; the steps below add the judgment layer on top (verdict

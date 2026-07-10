@@ -2,8 +2,8 @@ import json
 
 from fastapi.testclient import TestClient
 
-from stocklux import store
-from stocklux.server import build_overview, create_app
+from luxtock import store
+from luxtock.server import build_overview, create_app
 
 
 def client(data_dir):

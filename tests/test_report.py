@@ -9,7 +9,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from stocklux import check, report
+from luxtock import check, report
 
 TODAY = date.today()
 

@@ -1,4 +1,4 @@
-/* StockLux dashboard — talks only to the backend API; no LLM dependency. */
+/* Luxtock dashboard — talks only to the backend API; no LLM dependency. */
 const $ = (sel) => document.querySelector(sel);
 const state = { view: "overview", ticker: null, dataVersion: 0, quant: null, stocksCache: {} };
 
@@ -393,7 +393,7 @@ async function showStock(ticker) {
     · revisions ↑${rev.up_last_30d ?? "—"} / ↓${rev.down_last_30d ?? "—"} (30d)
     · analyst PT ${fmt(an.pt_low, 0)}–${fmt(an.pt_high, 0)} (mean ${fmt(an.pt_mean, 0)}, n=${an.n_analysts ?? "—"}, rec ${fmt(an.rec_mean, 1)})</div></div>`;
   html += cmdBlock(analyzeCmd(ticker));
-  html += cmdBlock(`stocklux export ${ticker} --pdf`);
+  html += cmdBlock(`luxtock export ${ticker} --pdf`);
   if (d.memos.length) {
     const dates = d.memos.map((m, i) =>
       `<option value="${i}">${esc(String(m.meta.date || m.path))}</option>`).join("");

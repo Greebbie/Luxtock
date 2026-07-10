@@ -7,7 +7,7 @@ discipline and the data contract. Write memos and reports in English.
 ## Preconditions (execute in order)
 
 1. Read `data/quotes.json` and `data/flows.json`. If either does not exist or
-   `fetched_at` is more than 24 hours old, run `stocklux refresh` yourself,
+   `fetched_at` is more than 24 hours old, run `luxtock refresh` yourself,
    then re-read them (prompt the user only if you cannot execute shell
    commands).
 2. Read `data/watchlist.json`. If the entry has a `thesis` attached (most

@@ -25,7 +25,7 @@ def refresh() -> None:
     data_dir = _data_dir()
     wl = store.load_watchlist(data_dir)
     if not wl["stocks"]:
-        typer.echo("watchlist is empty — add a stock first: `stocklux add <TICKER> --thesis <id>`")
+        typer.echo("watchlist is empty — add a stock first: `luxtock add <TICKER> --thesis <id>`")
         raise typer.Exit(1)
     quotes = refresh_mod.refresh_data(data_dir)
     for s in wl["stocks"]:
@@ -121,7 +121,7 @@ def shares(
     ticker: str,
     count: float = typer.Argument(..., help="share count (0 clears the field)"),
 ) -> None:
-    """Set the share count on a holding — sizing input for `stocklux portfolio`."""
+    """Set the share count on a holding — sizing input for `luxtock portfolio`."""
     data_dir = _data_dir()
     try:
         wl = store.set_shares(store.load_watchlist(data_dir), ticker.upper(), count)
@@ -136,7 +136,7 @@ def shares(
 def cash(
     amount: float = typer.Argument(..., help="cash balance in USD (negative clears it)"),
 ) -> None:
-    """Set the portfolio cash balance (context for `stocklux portfolio` weights)."""
+    """Set the portfolio cash balance (context for `luxtock portfolio` weights)."""
     data_dir = _data_dir()
     wl = store.set_cash(store.load_watchlist(data_dir), None if amount < 0 else amount)
     store.save_watchlist(data_dir, wl)
@@ -150,12 +150,12 @@ def portfolio() -> None:
 
     report = portfolio_report(_data_dir())
     if not report["positions"]:
-        typer.echo("no holdings — mark one with `stocklux hold <TICKER>` and size it "
-                   "with `stocklux shares <TICKER> <N>`")
+        typer.echo("no holdings — mark one with `luxtock hold <TICKER>` and size it "
+                   "with `luxtock shares <TICKER> <N>`")
         raise typer.Exit(0)
     for p in report["positions"]:
         if p.get("unsized"):
-            typer.echo(f"{p['ticker']:<6} (unsized — `stocklux shares {p['ticker']} <N>`)")
+            typer.echo(f"{p['ticker']:<6} (unsized — `luxtock shares {p['ticker']} <N>`)")
         else:
             typer.echo(f"{p['ticker']:<6} {p['shares']:>8.2f} sh × {p['price']:>10.2f} "
                        f"= {p['value']:>12,.0f}  {p['weight_pct']:>5.1f}%")

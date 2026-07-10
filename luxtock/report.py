@@ -4,7 +4,7 @@ analysis read for the whole book. This is an analysis document, not a
 reflection of the owner's positions -- it carries no sizing, weights, or
 holdings data.
 
-Reuses stocklux.export's machinery (inline CSS, formatting helpers, and the
+Reuses luxtock.export's machinery (inline CSS, formatting helpers, and the
 headless Edge/Chrome PDF-printing path) by import rather than duplicating
 it. Pure orchestration over the other modules' public functions — no new
 scoring or business logic lives here.

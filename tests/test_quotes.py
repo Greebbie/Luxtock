@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from stocklux import quotes
+from luxtock import quotes
 
 GOOD_INFO = {
     "currentPrice": 100.0, "trailingPE": 20.0, "forwardPE": 10.0,
